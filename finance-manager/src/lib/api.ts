@@ -1,5 +1,5 @@
 import axios from "axios"
 
 export const api = axios.create({
-  baseURL: "https://zzliy.zeabur.app/",
+  baseURL: "https://fastapi-0tu0.onrender.com",
 })
