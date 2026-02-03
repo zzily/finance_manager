@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "../lib/api"
 import type {
@@ -8,6 +8,7 @@ import type {
   SummaryResponse,
   Transaction,
   TransactionCreate,
+  TransactionUpdate,
 } from "../types"
 import { Button } from "../components/ui/button"
 import {
@@ -41,17 +42,26 @@ const currency = new Intl.NumberFormat("zh-CN", {
   maximumFractionDigits: 2,
 })
 
+const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+})
+
 async function fetchTransactions() {
-  const response = await api.get<Transaction[]>("/transactions/", {
-    params: { unpaid_only: true },
+  const response = await api.get<Transaction[]>("/transactions/")
+  return response.data
+}
+
+async function fetchSalaryLogsAvailable() {
+  const response = await api.get<SalaryLog[]>("/salary_logs/", {
+    params: { available_only: true },
   })
   return response.data
 }
 
-async function fetchSalaryLogs() {
-  const response = await api.get<SalaryLog[]>("/salary_logs/", {
-    params: { available_only: true },
-  })
+async function fetchSalaryLogsAll() {
+  const response = await api.get<SalaryLog[]>("/salary_logs/")
   return response.data
 }
 
@@ -75,15 +85,38 @@ async function settleDebt(payload: SettleRequest) {
   return response.data
 }
 
+async function updateTransaction(id: number, payload: TransactionUpdate) {
+  const response = await api.put<Transaction>(`/transactions/${id}`, payload)
+  return response.data
+}
+
+async function deleteTransaction(id: number) {
+  const response = await api.delete(`/transactions/${id}`)
+  return response.data
+}
+
 export default function SettlementPage() {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
   const [transactionOpen, setTransactionOpen] = useState(false)
   const [salaryOpen, setSalaryOpen] = useState(false)
+  const [salaryListOpen, setSalaryListOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [selectedSalaryId, setSelectedSalaryId] = useState<string>("")
   const [amount, setAmount] = useState<string>("")
   const [formError, setFormError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<"pending" | "history">("pending")
+  const [menuOpenId, setMenuOpenId] = useState<number | null>(null)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState<TransactionUpdate>({
+    title: "",
+    amount_out: 0,
+  })
+  const [editError, setEditError] = useState<string | null>(null)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [deletingTransaction, setDeletingTransaction] = useState<Transaction | null>(null)
   const [transactionForm, setTransactionForm] = useState<TransactionCreate>({
     title: "",
     amount_out: 0,
@@ -103,8 +136,13 @@ export default function SettlementPage() {
   })
 
   const salaryLogsQuery = useQuery({
-    queryKey: ["salary_logs"],
-    queryFn: fetchSalaryLogs,
+    queryKey: ["salary_logs", "available"],
+    queryFn: fetchSalaryLogsAvailable,
+  })
+
+  const salaryLogsAllQuery = useQuery({
+    queryKey: ["salary_logs", "all"],
+    queryFn: fetchSalaryLogsAll,
   })
 
   const summaryQuery = useQuery({
@@ -166,8 +204,13 @@ export default function SettlementPage() {
 
   const unsettledTransactions = useMemo(() => {
     const list = transactionsQuery.data ?? []
-    return list.filter((item) => item.amount_out - item.amount_reimbursed > 0)
+    return list.filter((item) => item.status !== "settled")
   }, [transactionsQuery.data])
+
+  const displayTransactions = useMemo(() => {
+    if (activeTab === "pending") return unsettledTransactions
+    return transactionsQuery.data ?? []
+  }, [activeTab, transactionsQuery.data, unsettledTransactions])
 
   const availableSalaryLogs = useMemo(() => {
     const list = salaryLogsQuery.data ?? []
@@ -199,6 +242,23 @@ export default function SettlementPage() {
   function openSalaryDialog() {
     setEntryError(null)
     setSalaryOpen(true)
+  }
+
+  function openSalaryList() {
+    setSalaryListOpen(true)
+  }
+
+  function openEditDialog(transaction: Transaction) {
+    setEditingTransaction(transaction)
+    setEditForm({ title: transaction.title, amount_out: transaction.amount_out })
+    setEditError(null)
+    setEditOpen(true)
+  }
+
+  function openDeleteDialog(transaction: Transaction) {
+    setDeletingTransaction(transaction)
+    setDeleteError(null)
+    setDeleteOpen(true)
   }
 
   function handleSubmit() {
@@ -263,9 +323,68 @@ export default function SettlementPage() {
     })
   }
 
+  function handleUpdateTransaction() {
+    if (!editingTransaction) return
+    if (!editForm.title.trim()) {
+      setEditError("请输入账单标题")
+      return
+    }
+    const numericAmount = Number(editForm.amount_out)
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      setEditError("请输入有效的账单金额")
+      return
+    }
+    setEditError(null)
+    updateMutation.mutate({
+      id: editingTransaction.id,
+      payload: { title: editForm.title.trim(), amount_out: numericAmount },
+    })
+  }
+
+  function handleDeleteTransaction() {
+    if (!deletingTransaction) return
+    deleteMutation.mutate(deletingTransaction.id)
+  }
+
   const summary = summaryQuery.data
   const availableBalance = summary?.operational_status.cash_waiting_allocation ?? 0
   const netDebt = summary?.financial_status.current_net_debt ?? 0
+
+  useEffect(() => {
+    if (menuOpenId === null) return
+    const handler = () => setMenuOpenId(null)
+    document.addEventListener("click", handler)
+    return () => document.removeEventListener("click", handler)
+  }, [menuOpenId])
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: number; payload: TransactionUpdate }) =>
+      updateTransaction(id, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["summary"] }),
+      ])
+      setEditOpen(false)
+    },
+    onError: () => {
+      setEditError("修改失败，请稍后重试")
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteTransaction,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["summary"] }),
+      ])
+      setDeleteOpen(false)
+    },
+    onError: () => {
+      setDeleteError("删除失败，请稍后重试")
+    },
+  })
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
@@ -276,13 +395,31 @@ export default function SettlementPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div
+            className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300"
+            role="button"
+            tabIndex={0}
+            onClick={openSalaryList}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault()
+                openSalaryList()
+              }
+            }}
+          >
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">资金池余额</h2>
                 <p className="text-xs text-slate-500">可用于核销的未分配回款</p>
               </div>
-              <Button variant="outline" size="sm" onClick={openSalaryDialog}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openSalaryDialog()
+                }}
+              >
                 父亲回款了
               </Button>
             </div>
@@ -292,6 +429,7 @@ export default function SettlementPage() {
             <p className="mt-2 text-xs text-slate-500">
               {summary?.operational_status.action_needed ?? "正在加载资金池数据"}
             </p>
+            <p className="mt-3 text-xs text-slate-400">点击卡片查看资金池明细</p>
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -340,6 +478,33 @@ export default function SettlementPage() {
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+            <div className="flex items-center gap-2 text-sm">
+              <button
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  activeTab === "pending"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+                onClick={() => setActiveTab("pending")}
+              >
+                待核销
+              </button>
+              <button
+                className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                  activeTab === "history"
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+                onClick={() => setActiveTab("history")}
+              >
+                全部/历史记录
+              </button>
+            </div>
+            <span className="text-xs text-slate-500">
+              {activeTab === "pending" ? "仅显示未结清账单" : "展示全部账单记录"}
+            </span>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -366,14 +531,14 @@ export default function SettlementPage() {
                   </TableCell>
                 </TableRow>
               )}
-              {!transactionsQuery.isLoading && unsettledTransactions.length === 0 && (
+              {!transactionsQuery.isLoading && displayTransactions.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-slate-500">
-                    暂无未结清账单
+                    {activeTab === "pending" ? "暂无未结清账单" : "暂无账单记录"}
                   </TableCell>
                 </TableRow>
               )}
-              {unsettledTransactions.map((item) => {
+              {displayTransactions.map((item) => {
                 const due = item.amount_out - item.amount_reimbursed
                 return (
                   <TableRow key={item.id}>
@@ -385,7 +550,45 @@ export default function SettlementPage() {
                     <TableCell>{currency.format(due)}</TableCell>
                     <TableCell>{item.status}</TableCell>
                     <TableCell className="text-right">
-                      <Button onClick={() => openDialog(item)}>核销</Button>
+                      <div className="relative inline-flex items-center justify-end gap-2">
+                        {item.status !== "settled" && (
+                          <Button onClick={() => openDialog(item)}>核销</Button>
+                        )}
+                        <button
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-100"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setMenuOpenId((prev) => (prev === item.id ? null : item.id))
+                          }}
+                        >
+                          ...
+                        </button>
+                        {menuOpenId === item.id && (
+                          <div
+                            className="absolute right-0 top-11 z-10 w-32 rounded-md border border-slate-200 bg-white py-1 text-left shadow-md"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            <button
+                              className="block w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                              onClick={() => {
+                                setMenuOpenId(null)
+                                openEditDialog(item)
+                              }}
+                            >
+                              编辑
+                            </button>
+                            <button
+                              className="block w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                              onClick={() => {
+                                setMenuOpenId(null)
+                                openDeleteDialog(item)
+                              }}
+                            >
+                              删除
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 )
@@ -650,6 +853,167 @@ export default function SettlementPage() {
             </Button>
             <Button onClick={handleCreateSalaryLog} disabled={salaryMutation.isPending}>
               {salaryMutation.isPending ? "提交中..." : "确认录入"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={salaryListOpen} onOpenChange={setSalaryListOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>资金池明细</DialogTitle>
+            <DialogDescription>查看所有回款的使用情况</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>到账日期</TableHead>
+                  <TableHead>来源</TableHead>
+                  <TableHead>总金额</TableHead>
+                  <TableHead>已用</TableHead>
+                  <TableHead>剩余</TableHead>
+                  <TableHead>备注</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {salaryLogsAllQuery.isLoading && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-slate-500">
+                      加载中...
+                    </TableCell>
+                  </TableRow>
+                )}
+                {salaryLogsAllQuery.isError && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-red-600">
+                      无法加载回款明细，请稍后重试
+                    </TableCell>
+                  </TableRow>
+                )}
+                {!salaryLogsAllQuery.isLoading &&
+                  (salaryLogsAllQuery.data ?? []).length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-slate-500">
+                        暂无回款记录
+                      </TableCell>
+                    </TableRow>
+                  )}
+                {(salaryLogsAllQuery.data ?? []).map((log) => {
+                  const usedAmount = log.amount - log.amount_unused
+                  return (
+                    <TableRow key={log.id}>
+                      <TableCell>
+                        {dateFormatter.format(new Date(log.received_date))}
+                      </TableCell>
+                      <TableCell>{log.source}</TableCell>
+                      <TableCell>{currency.format(log.amount)}</TableCell>
+                      <TableCell>{currency.format(usedAmount)}</TableCell>
+                      <TableCell>{currency.format(log.amount_unused)}</TableCell>
+                      <TableCell>{log.remark || "-"}</TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setSalaryListOpen(false)}>
+              关闭
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>编辑账单</DialogTitle>
+            <DialogDescription>修改标题或金额</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">标题</label>
+              <Input
+                value={editForm.title}
+                onChange={(event) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    title: event.target.value,
+                  }))
+                }
+                placeholder="例如：给车加油"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">金额</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={editForm.amount_out || ""}
+                onChange={(event) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    amount_out: Number(event.target.value),
+                  }))
+                }
+                placeholder="请输入账单金额"
+              />
+            </div>
+            {editError && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {editError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setEditOpen(false)}
+              disabled={updateMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button onClick={handleUpdateTransaction} disabled={updateMutation.isPending}>
+              {updateMutation.isPending ? "保存中..." : "保存修改"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>删除账单</DialogTitle>
+            <DialogDescription>
+              删除后无法恢复，请确认是否删除该账单。
+            </DialogDescription>
+          </DialogHeader>
+          {deletingTransaction && (
+            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {deletingTransaction.title} · {currency.format(deletingTransaction.amount_out)}
+            </div>
+          )}
+          {deleteError && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {deleteError}
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setDeleteOpen(false)}
+              disabled={deleteMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteTransaction}
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? "删除中..." : "确认删除"}
             </Button>
           </DialogFooter>
         </DialogContent>

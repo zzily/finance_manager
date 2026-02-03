@@ -25,6 +25,11 @@ export type TransactionCreate = {
   category: "work" | "personal"
 }
 
+export type TransactionUpdate = {
+  title: string
+  amount_out: number
+}
+
 export type SalaryLogCreate = {
   amount: number
   month: string
