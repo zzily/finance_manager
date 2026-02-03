@@ -48,6 +48,21 @@ const dateFormatter = new Intl.DateTimeFormat("zh-CN", {
   day: "2-digit",
 })
 
+const statusLabels: Record<
+  Transaction["status"],
+  "待核销" | "部分核销" | "已结清"
+> = {
+  pending: "待核销",
+  partially_settled: "部分核销",
+  settled: "已结清",
+}
+
+const sourceLabels: Record<SalaryLog["source"], "工资" | "报销" | "其他"> = {
+  salary: "工资",
+  reimbursement: "报销",
+  other: "其他",
+}
+
 async function fetchTransactions() {
   const response = await api.get<Transaction[]>("/transactions/")
   return response.data
@@ -112,6 +127,7 @@ export default function SettlementPage() {
   const [editForm, setEditForm] = useState<TransactionUpdate>({
     title: "",
     amount_out: 0,
+    category: "work",
   })
   const [editError, setEditError] = useState<string | null>(null)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -250,7 +266,11 @@ export default function SettlementPage() {
 
   function openEditDialog(transaction: Transaction) {
     setEditingTransaction(transaction)
-    setEditForm({ title: transaction.title, amount_out: transaction.amount_out })
+    setEditForm({
+      title: transaction.title,
+      amount_out: transaction.amount_out,
+      category: transaction.category,
+    })
     setEditError(null)
     setEditOpen(true)
   }
@@ -337,7 +357,11 @@ export default function SettlementPage() {
     setEditError(null)
     updateMutation.mutate({
       id: editingTransaction.id,
-      payload: { title: editForm.title.trim(), amount_out: numericAmount },
+      payload: {
+        title: editForm.title.trim(),
+        amount_out: numericAmount,
+        category: editForm.category,
+      },
     })
   }
 
@@ -509,6 +533,7 @@ export default function SettlementPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>标题</TableHead>
+                <TableHead>类型</TableHead>
                 <TableHead>账单金额</TableHead>
                 <TableHead>已还</TableHead>
                 <TableHead>未结清</TableHead>
@@ -519,21 +544,21 @@ export default function SettlementPage() {
             <TableBody>
               {transactionsQuery.isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-slate-500">
+                  <TableCell colSpan={7} className="text-center text-slate-500">
                     加载中...
                   </TableCell>
                 </TableRow>
               )}
               {transactionsQuery.isError && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-red-600">
+                  <TableCell colSpan={7} className="text-center text-red-600">
                     无法加载账单，请稍后重试
                   </TableCell>
                 </TableRow>
               )}
               {!transactionsQuery.isLoading && displayTransactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-slate-500">
+                  <TableCell colSpan={7} className="text-center text-slate-500">
                     {activeTab === "pending" ? "暂无未结清账单" : "暂无账单记录"}
                   </TableCell>
                 </TableRow>
@@ -545,10 +570,13 @@ export default function SettlementPage() {
                     <TableCell className="font-medium text-slate-900">
                       {item.title}
                     </TableCell>
+                    <TableCell>
+                      {item.category === "work" ? "工作" : "个人"}
+                    </TableCell>
                     <TableCell>{currency.format(item.amount_out)}</TableCell>
                     <TableCell>{currency.format(item.amount_reimbursed)}</TableCell>
                     <TableCell>{currency.format(due)}</TableCell>
-                    <TableCell>{item.status}</TableCell>
+                    <TableCell>{statusLabels[item.status]}</TableCell>
                     <TableCell className="text-right">
                       <div className="relative inline-flex items-center justify-end gap-2">
                         {item.status !== "settled" && (
@@ -906,7 +934,7 @@ export default function SettlementPage() {
                       <TableCell>
                         {dateFormatter.format(new Date(log.received_date))}
                       </TableCell>
-                      <TableCell>{log.source}</TableCell>
+                      <TableCell>{sourceLabels[log.source]}</TableCell>
                       <TableCell>{currency.format(log.amount)}</TableCell>
                       <TableCell>{currency.format(usedAmount)}</TableCell>
                       <TableCell>{currency.format(log.amount_unused)}</TableCell>
@@ -960,6 +988,26 @@ export default function SettlementPage() {
                 }
                 placeholder="请输入账单金额"
               />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">分类</label>
+              <Select
+                value={editForm.category}
+                onValueChange={(value) =>
+                  setEditForm((prev) => ({
+                    ...prev,
+                    category: value as TransactionUpdate["category"],
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="请选择分类" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="work">工作</SelectItem>
+                  <SelectItem value="personal">个人</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {editError && (
               <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">

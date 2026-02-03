@@ -5,6 +5,7 @@ export type Transaction = {
   title: string
   amount_out: number
   amount_reimbursed: number
+  category: "work" | "personal"
   status: TransactionStatus
   created_at: string
 }
@@ -28,6 +29,7 @@ export type TransactionCreate = {
 export type TransactionUpdate = {
   title: string
   amount_out: number
+  category: "work" | "personal"
 }
 
 export type SalaryLogCreate = {
