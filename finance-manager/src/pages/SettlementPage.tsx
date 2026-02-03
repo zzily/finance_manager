@@ -1,7 +1,14 @@
 import { useMemo, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "../lib/api"
-import type { SalaryLog, SettleRequest, Transaction } from "../types"
+import type {
+  SalaryLog,
+  SalaryLogCreate,
+  SettleRequest,
+  SummaryResponse,
+  Transaction,
+  TransactionCreate,
+} from "../types"
 import { Button } from "../components/ui/button"
 import {
   Dialog,
@@ -48,6 +55,21 @@ async function fetchSalaryLogs() {
   return response.data
 }
 
+async function fetchSummary() {
+  const response = await api.get<SummaryResponse>("/summary")
+  return response.data
+}
+
+async function createTransaction(payload: TransactionCreate) {
+  const response = await api.post<Transaction>("/transactions/", payload)
+  return response.data
+}
+
+async function createSalaryLog(payload: SalaryLogCreate) {
+  const response = await api.post<SalaryLog>("/salary_logs/", payload)
+  return response.data
+}
+
 async function settleDebt(payload: SettleRequest) {
   const response = await api.post("/settle", payload)
   return response.data
@@ -56,10 +78,24 @@ async function settleDebt(payload: SettleRequest) {
 export default function SettlementPage() {
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
+  const [transactionOpen, setTransactionOpen] = useState(false)
+  const [salaryOpen, setSalaryOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
   const [selectedSalaryId, setSelectedSalaryId] = useState<string>("")
   const [amount, setAmount] = useState<string>("")
   const [formError, setFormError] = useState<string | null>(null)
+  const [transactionForm, setTransactionForm] = useState<TransactionCreate>({
+    title: "",
+    amount_out: 0,
+    category: "work",
+  })
+  const [salaryForm, setSalaryForm] = useState<SalaryLogCreate>({
+    amount: 0,
+    month: "",
+    source: "salary",
+    remark: "",
+  })
+  const [entryError, setEntryError] = useState<string | null>(null)
 
   const transactionsQuery = useQuery({
     queryKey: ["transactions"],
@@ -71,12 +107,18 @@ export default function SettlementPage() {
     queryFn: fetchSalaryLogs,
   })
 
+  const summaryQuery = useQuery({
+    queryKey: ["summary"],
+    queryFn: fetchSummary,
+  })
+
   const settleMutation = useMutation({
     mutationFn: settleDebt,
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["transactions"] }),
         queryClient.invalidateQueries({ queryKey: ["salary_logs"] }),
+        queryClient.invalidateQueries({ queryKey: ["summary"] }),
       ])
       setOpen(false)
     },
@@ -87,6 +129,38 @@ export default function SettlementPage() {
         return
       }
       setFormError("核销失败，请稍后重试")
+    },
+  })
+
+  const transactionMutation = useMutation({
+    mutationFn: createTransaction,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["transactions"] }),
+        queryClient.invalidateQueries({ queryKey: ["summary"] }),
+      ])
+      setTransactionForm({ title: "", amount_out: 0, category: "work" })
+      setEntryError(null)
+      setTransactionOpen(false)
+    },
+    onError: () => {
+      setEntryError("新增垫付失败，请稍后重试")
+    },
+  })
+
+  const salaryMutation = useMutation({
+    mutationFn: createSalaryLog,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["salary_logs"] }),
+        queryClient.invalidateQueries({ queryKey: ["summary"] }),
+      ])
+      setSalaryForm({ amount: 0, month: "", source: "salary", remark: "" })
+      setEntryError(null)
+      setSalaryOpen(false)
+    },
+    onError: () => {
+      setEntryError("新增回款失败，请稍后重试")
     },
   })
 
@@ -117,6 +191,16 @@ export default function SettlementPage() {
     setOpen(true)
   }
 
+  function openTransactionDialog() {
+    setEntryError(null)
+    setTransactionOpen(true)
+  }
+
+  function openSalaryDialog() {
+    setEntryError(null)
+    setSalaryOpen(true)
+  }
+
   function handleSubmit() {
     if (!selectedTransaction) return
     if (!selectedSalaryId) {
@@ -144,12 +228,115 @@ export default function SettlementPage() {
     })
   }
 
+  function handleCreateTransaction() {
+    const numericAmount = Number(transactionForm.amount_out)
+    if (!transactionForm.title.trim()) {
+      setEntryError("请输入垫付标题")
+      return
+    }
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      setEntryError("请输入有效的垫付金额")
+      return
+    }
+    setEntryError(null)
+    transactionMutation.mutate({
+      ...transactionForm,
+      amount_out: numericAmount,
+    })
+  }
+
+  function handleCreateSalaryLog() {
+    const numericAmount = Number(salaryForm.amount)
+    if (Number.isNaN(numericAmount) || numericAmount <= 0) {
+      setEntryError("请输入有效的回款金额")
+      return
+    }
+    if (!salaryForm.month) {
+      setEntryError("请选择回款月份")
+      return
+    }
+    setEntryError(null)
+    salaryMutation.mutate({
+      ...salaryForm,
+      amount: numericAmount,
+      remark: salaryForm.remark?.trim() || null,
+    })
+  }
+
+  const summary = summaryQuery.data
+  const availableBalance = summary?.operational_status.cash_waiting_allocation ?? 0
+  const netDebt = summary?.financial_status.current_net_debt ?? 0
+
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-6xl space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">核销页面</h1>
           <p className="text-sm text-slate-500">请选择未结清账单进行核销操作</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">资金池余额</h2>
+                <p className="text-xs text-slate-500">可用于核销的未分配回款</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={openSalaryDialog}>
+                父亲回款了
+              </Button>
+            </div>
+            <div className="mt-4 text-2xl font-semibold text-slate-900">
+              {currency.format(availableBalance)}
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {summary?.operational_status.action_needed ?? "正在加载资金池数据"}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">记账入口</h2>
+                <p className="text-xs text-slate-500">录入你的垫付与回款</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={openTransactionDialog}>
+                我垫付了
+              </Button>
+            </div>
+            <div className="mt-4 space-y-2 text-xs text-slate-500">
+              <p>垫付会形成新的债权账单</p>
+              <p>回款会进入资金池，待分配后核销</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">总垫付金额</p>
+            <p className="mt-2 text-xl font-semibold text-slate-900">
+              {currency.format(summary?.financial_status.total_lent_by_you ?? 0)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">总回血金额</p>
+            <p className="mt-2 text-xl font-semibold text-slate-900">
+              {currency.format(summary?.financial_status.total_received_back ?? 0)}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">当前净欠款</p>
+            <p
+              className={`mt-2 text-xl font-semibold ${
+                netDebt > 0 ? "text-red-600" : "text-emerald-600"
+              }`}
+            >
+              {currency.format(netDebt)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {summary?.financial_status.status ?? "正在计算"}
+            </p>
+          </div>
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -292,6 +479,177 @@ export default function SettlementPage() {
             </Button>
             <Button onClick={handleSubmit} disabled={settleMutation.isPending}>
               {settleMutation.isPending ? "提交中..." : "确认核销"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={transactionOpen} onOpenChange={setTransactionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>我垫付了</DialogTitle>
+            <DialogDescription>新增一笔垫付账单</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">标题</label>
+              <Input
+                value={transactionForm.title}
+                onChange={(event) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    title: event.target.value,
+                  }))
+                }
+                placeholder="例如：给车加油"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">金额</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={transactionForm.amount_out || ""}
+                onChange={(event) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    amount_out: Number(event.target.value),
+                  }))
+                }
+                placeholder="请输入垫付金额"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">分类</label>
+              <Select
+                value={transactionForm.category}
+                onValueChange={(value) =>
+                  setTransactionForm((prev) => ({
+                    ...prev,
+                    category: value as TransactionCreate["category"],
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="请选择分类" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="work">工作</SelectItem>
+                  <SelectItem value="personal">个人</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {entryError && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {entryError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setTransactionOpen(false)}
+              disabled={transactionMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button
+              onClick={handleCreateTransaction}
+              disabled={transactionMutation.isPending}
+            >
+              {transactionMutation.isPending ? "提交中..." : "确认录入"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={salaryOpen} onOpenChange={setSalaryOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>父亲回款了</DialogTitle>
+            <DialogDescription>新增一笔回款进入资金池</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">金额</label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                value={salaryForm.amount || ""}
+                onChange={(event) =>
+                  setSalaryForm((prev) => ({
+                    ...prev,
+                    amount: Number(event.target.value),
+                  }))
+                }
+                placeholder="例如：5000"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">回款月份</label>
+              <Input
+                type="month"
+                value={salaryForm.month}
+                onChange={(event) =>
+                  setSalaryForm((prev) => ({
+                    ...prev,
+                    month: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">来源</label>
+              <Select
+                value={salaryForm.source}
+                onValueChange={(value) =>
+                  setSalaryForm((prev) => ({
+                    ...prev,
+                    source: value as SalaryLogCreate["source"],
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="请选择来源" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="salary">工资</SelectItem>
+                  <SelectItem value="reimbursement">报销</SelectItem>
+                  <SelectItem value="other">其他</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm text-slate-500">备注</label>
+              <Input
+                value={salaryForm.remark ?? ""}
+                onChange={(event) =>
+                  setSalaryForm((prev) => ({
+                    ...prev,
+                    remark: event.target.value,
+                  }))
+                }
+                placeholder="例如：收到工资转账"
+              />
+            </div>
+            {entryError && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {entryError}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setSalaryOpen(false)}
+              disabled={salaryMutation.isPending}
+            >
+              取消
+            </Button>
+            <Button onClick={handleCreateSalaryLog} disabled={salaryMutation.isPending}>
+              {salaryMutation.isPending ? "提交中..." : "确认录入"}
             </Button>
           </DialogFooter>
         </DialogContent>
