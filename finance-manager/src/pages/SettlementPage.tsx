@@ -372,7 +372,13 @@ export default function SettlementPage() {
 
   const summary = summaryQuery.data
   const availableBalance = summary?.operational_status.cash_waiting_allocation ?? 0
-  const netDebt = summary?.financial_status.current_net_debt ?? 0
+  const businessLoop = summary?.financial_status.business_loop
+  const familyLoop = summary?.financial_status.family_loop
+  const businessDebt = businessLoop?.current_debt ?? 0
+  const personalSpending = familyLoop?.personal_spending ?? 0
+  const netSavings = familyLoop?.net_savings ?? 0
+  const totalAssets = summary?.financial_status.total_assets ?? 0
+  const billsPending = summary?.operational_status.bills_pending_settlement ?? 0
 
   useEffect(() => {
     if (menuOpenId === null) return
@@ -473,30 +479,120 @@ export default function SettlementPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-500">总垫付金额</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">
-              {currency.format(summary?.financial_status.total_lent_by_you ?? 0)}
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">公司往来</h2>
+                <p className="text-xs text-slate-500">目标：归零</p>
+              </div>
+              <span
+                className={`text-xs font-medium ${
+                  businessDebt > 0 ? "text-red-600" : "text-emerald-600"
+                }`}
+              >
+                {businessDebt > 0 ? "盯着老板要" : "已平账"}
+              </span>
+            </div>
+            <div className="mt-4 space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">垫付总额</span>
+                <span className="font-medium text-slate-900">
+                  {currency.format(businessLoop?.total_lent ?? 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">报销回款</span>
+                <span className="font-medium text-slate-900">
+                  {currency.format(businessLoop?.total_reimbursed ?? 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">待回款</span>
+                <span
+                  className={`font-semibold ${
+                    businessDebt > 0 ? "text-red-600" : "text-emerald-600"
+                  }`}
+                >
+                  {currency.format(businessDebt)}
+                </span>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              {businessLoop?.status ?? "正在计算"}
             </p>
           </div>
+
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-500">总回血金额</p>
-            <p className="mt-2 text-xl font-semibold text-slate-900">
-              {currency.format(summary?.financial_status.total_received_back ?? 0)}
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-slate-900">家庭储蓄</h2>
+                <p className="text-xs text-slate-500">目标：持续增长</p>
+              </div>
+              <span
+                className={`text-xs font-medium ${
+                  netSavings >= 0 ? "text-emerald-600" : "text-red-600"
+                }`}
+              >
+                {netSavings >= 0 ? "资产增值中" : "入不敷出"}
+              </span>
+            </div>
+            <div className="mt-4 space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">工资收入</span>
+                <span className="font-medium text-slate-900">
+                  {currency.format(familyLoop?.gross_income ?? 0)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">个人消费</span>
+                <span className="font-medium text-rose-600">
+                  -{currency.format(Math.abs(personalSpending))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">净储蓄</span>
+                <span
+                  className={`font-semibold ${
+                    netSavings >= 0 ? "text-emerald-600" : "text-red-600"
+                  }`}
+                >
+                  {currency.format(netSavings)}
+                </span>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-slate-500">
+              {familyLoop?.status ?? "正在计算"}
             </p>
           </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <p className="text-xs text-slate-500">当前净欠款</p>
-            <p
-              className={`mt-2 text-xl font-semibold ${
-                netDebt > 0 ? "text-red-600" : "text-emerald-600"
-              }`}
-            >
-              {currency.format(netDebt)}
+            <p className="text-xs text-slate-500">总资产</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {currency.format(totalAssets)}
             </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {summary?.financial_status.status ?? "正在计算"}
+            <p className="mt-1 text-xs text-slate-500">现金 + 待回款</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs text-slate-500">操作概览</p>
+            <div className="mt-3 space-y-1 text-sm text-slate-600">
+              <div className="flex items-center justify-between">
+                <span>待核销账单</span>
+                <span className="font-medium text-slate-900">
+                  {currency.format(billsPending)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>未分配现金</span>
+                <span className="font-medium text-slate-900">
+                  {currency.format(availableBalance)}
+                </span>
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-500">
+              {summary?.operational_status.action_needed ?? "正在计算"}
             </p>
           </div>
         </div>

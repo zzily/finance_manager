@@ -48,10 +48,19 @@ export type SettleRequest = {
 export type SummaryResponse = {
   financial_status: {
     description: string
-    total_lent_by_you: number
-    total_received_back: number
-    current_net_debt: number
-    status: string
+    business_loop: {
+      total_lent: number
+      total_reimbursed: number
+      current_debt: number
+      status: string
+    }
+    family_loop: {
+      gross_income: number
+      personal_spending: number
+      net_savings: number
+      status: string
+    }
+    total_assets: number
   }
   operational_status: {
     description: string
