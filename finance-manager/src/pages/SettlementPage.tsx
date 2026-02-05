@@ -11,6 +11,7 @@ import type {
   TransactionUpdate,
 } from "../types"
 import { Button } from "../components/ui/button"
+import { Badge } from "../components/ui/badge"
 import {
   Dialog,
   DialogContent,
@@ -510,7 +511,7 @@ export default function SettlementPage() {
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">待回款</span>
                 <span
-                  className={`font-semibold ${
+                  className={`text-2xl font-bold ${
                     businessDebt > 0 ? "text-red-600" : "text-emerald-600"
                   }`}
                 >
@@ -546,14 +547,14 @@ export default function SettlementPage() {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">个人消费</span>
-                <span className="font-medium text-rose-600">
+                <span className="font-medium text-orange-600">
                   -{currency.format(Math.abs(personalSpending))}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-slate-500">净储蓄</span>
                 <span
-                  className={`font-semibold ${
+                  className={`text-2xl font-bold ${
                     netSavings >= 0 ? "text-emerald-600" : "text-red-600"
                   }`}
                 >
@@ -667,7 +668,15 @@ export default function SettlementPage() {
                       {item.title}
                     </TableCell>
                     <TableCell>
-                      {item.category === "work" ? "工作" : "个人"}
+                      {item.category === "work" ? (
+                        <Badge className="border border-blue-200 bg-blue-50 text-blue-700">
+                          工作
+                        </Badge>
+                      ) : (
+                        <Badge className="border border-orange-200 bg-orange-50 text-orange-700">
+                          个人
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>{currency.format(item.amount_out)}</TableCell>
                     <TableCell>{currency.format(item.amount_reimbursed)}</TableCell>
