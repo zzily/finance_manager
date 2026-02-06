@@ -118,6 +118,10 @@ export default function SettlementPage() {
   const [salaryOpen, setSalaryOpen] = useState(false)
   const [salaryListOpen, setSalaryListOpen] = useState(false)
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+  const [toast, setToast] = useState<{
+    message: string
+    type: "success" | "error"
+  } | null>(null)
   const [selectedSalaryId, setSelectedSalaryId] = useState<string>("")
   const [amount, setAmount] = useState<string>("")
   const [formError, setFormError] = useState<string | null>(null)
@@ -146,6 +150,10 @@ export default function SettlementPage() {
     remark: "",
   })
   const [entryError, setEntryError] = useState<string | null>(null)
+
+  function showToast(message: string, type: "success" | "error" = "success") {
+    setToast({ message, type })
+  }
 
   const transactionsQuery = useQuery({
     queryKey: ["transactions"],
@@ -176,6 +184,7 @@ export default function SettlementPage() {
         queryClient.invalidateQueries({ queryKey: ["summary"] }),
       ])
       setOpen(false)
+      showToast("核销成功")
     },
     onError: (error) => {
       if (typeof error === "object" && error && "response" in error) {
@@ -197,6 +206,7 @@ export default function SettlementPage() {
       setTransactionForm({ title: "", amount_out: 0, category: "work" })
       setEntryError(null)
       setTransactionOpen(false)
+      showToast("垫付已记录")
     },
     onError: () => {
       setEntryError("新增垫付失败，请稍后重试")
@@ -213,6 +223,7 @@ export default function SettlementPage() {
       setSalaryForm({ amount: 0, month: "", source: "salary", remark: "" })
       setEntryError(null)
       setSalaryOpen(false)
+      showToast("回款已入账")
     },
     onError: () => {
       setEntryError("新增回款失败，请稍后重试")
@@ -388,6 +399,12 @@ export default function SettlementPage() {
     return () => document.removeEventListener("click", handler)
   }, [menuOpenId])
 
+  useEffect(() => {
+    if (!toast) return
+    const timer = window.setTimeout(() => setToast(null), 2500)
+    return () => window.clearTimeout(timer)
+  }, [toast])
+
   const updateMutation = useMutation({
     mutationFn: ({ id, payload }: { id: number; payload: TransactionUpdate }) =>
       updateTransaction(id, payload),
@@ -397,6 +414,7 @@ export default function SettlementPage() {
         queryClient.invalidateQueries({ queryKey: ["summary"] }),
       ])
       setEditOpen(false)
+      showToast("账单已更新")
     },
     onError: () => {
       setEditError("修改失败，请稍后重试")
@@ -411,6 +429,7 @@ export default function SettlementPage() {
         queryClient.invalidateQueries({ queryKey: ["summary"] }),
       ])
       setDeleteOpen(false)
+      showToast("账单已删除")
     },
     onError: () => {
       setDeleteError("删除失败，请稍后重试")
@@ -418,7 +437,33 @@ export default function SettlementPage() {
   })
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-slate-100 p-6">
+      {toast && (
+        <div className="fixed right-6 top-6 z-50">
+          <div
+            className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg transition ${
+              toast.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-red-200 bg-red-50 text-red-700"
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="font-medium">{toast.message}</span>
+            <button
+              type="button"
+              className={`text-xs transition ${
+                toast.type === "success"
+                  ? "text-emerald-700/70 hover:text-emerald-700"
+                  : "text-red-700/70 hover:text-red-700"
+              }`}
+              onClick={() => setToast(null)}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-6xl space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">核销页面</h1>
@@ -427,7 +472,7 @@ export default function SettlementPage() {
 
         <div className="grid gap-4 md:grid-cols-[1.2fr_0.8fr]">
           <div
-            className="cursor-pointer rounded-lg border border-slate-200 bg-white p-4 shadow-sm transition hover:border-slate-300"
+            className="cursor-pointer rounded-[20px] border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-white p-5 shadow-sm transition hover:border-blue-300 hover:bg-white/80 hover:backdrop-blur-sm hover:ring-1 hover:ring-white/70 hover:shadow-[0_12px_30px_-20px_rgba(148,163,184,0.7)]"
             role="button"
             tabIndex={0}
             onClick={openSalaryList}
@@ -440,7 +485,10 @@ export default function SettlementPage() {
           >
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">资金池余额</h2>
+                <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+                  主KPI
+                </p>
+                <h2 className="text-base font-semibold text-slate-900">资金池余额</h2>
                 <p className="text-xs text-slate-500">可用于核销的未分配回款</p>
               </div>
               <Button
@@ -451,10 +499,10 @@ export default function SettlementPage() {
                   openSalaryDialog()
                 }}
               >
-                D登回款了
+                我回款了
               </Button>
             </div>
-            <div className="mt-4 text-2xl font-semibold text-slate-900">
+            <div className="mt-4 text-3xl font-semibold text-slate-900">
               {currency.format(availableBalance)}
             </div>
             <p className="mt-2 text-xs text-slate-500">
@@ -463,7 +511,7 @@ export default function SettlementPage() {
             <p className="mt-3 text-xs text-slate-400">点击卡片查看资金池明细</p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:bg-white/80 hover:backdrop-blur-sm hover:ring-1 hover:ring-white/70 hover:shadow-[0_12px_30px_-20px_rgba(148,163,184,0.7)]">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">记账入口</h2>
@@ -481,10 +529,13 @@ export default function SettlementPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-[20px] border border-rose-200 bg-gradient-to-br from-rose-50 via-white to-white p-5 shadow-sm transition hover:border-rose-300 hover:bg-white/80 hover:backdrop-blur-sm hover:ring-1 hover:ring-white/70 hover:shadow-[0_12px_30px_-20px_rgba(148,163,184,0.7)]">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">公司往来</h2>
+                <p className="text-xs font-semibold uppercase tracking-wide text-rose-600">
+                  主KPI
+                </p>
+                <h2 className="text-base font-semibold text-slate-900">公司往来</h2>
                 <p className="text-xs text-slate-500">目标：归零</p>
               </div>
               <span
@@ -524,10 +575,13 @@ export default function SettlementPage() {
             </p>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-[20px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-white p-5 shadow-sm transition hover:border-emerald-300 hover:bg-white/80 hover:backdrop-blur-sm hover:ring-1 hover:ring-white/70 hover:shadow-[0_12px_30px_-20px_rgba(148,163,184,0.7)]">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-sm font-semibold text-slate-900">家庭储蓄</h2>
+                <p className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                  主KPI
+                </p>
+                <h2 className="text-base font-semibold text-slate-900">家庭储蓄</h2>
                 <p className="text-xs text-slate-500">目标：持续增长</p>
               </div>
               <span
@@ -569,14 +623,14 @@ export default function SettlementPage() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:bg-white/80 hover:backdrop-blur-sm hover:ring-1 hover:ring-white/70 hover:shadow-[0_12px_30px_-20px_rgba(148,163,184,0.7)]">
             <p className="text-xs text-slate-500">总资产</p>
             <p className="mt-2 text-2xl font-semibold text-slate-900">
               {currency.format(totalAssets)}
             </p>
             <p className="mt-1 text-xs text-slate-500">现金 + 待回款</p>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:bg-white/80 hover:backdrop-blur-sm hover:ring-1 hover:ring-white/70 hover:shadow-[0_12px_30px_-20px_rgba(148,163,184,0.7)]">
             <p className="text-xs text-slate-500">操作概览</p>
             <div className="mt-3 space-y-1 text-sm text-slate-600">
               <div className="flex items-center justify-between">
@@ -598,7 +652,7 @@ export default function SettlementPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="rounded-[20px] border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
             <div className="flex items-center gap-2 text-sm">
               <button
@@ -622,41 +676,84 @@ export default function SettlementPage() {
                 全部/历史记录
               </button>
             </div>
-            <span className="text-xs text-slate-500">
-              {activeTab === "pending" ? "仅显示未结清账单" : "展示全部账单记录"}
-            </span>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>
+                {activeTab === "pending" ? "仅显示未结清账单" : "展示全部账单记录"}
+              </span>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-400"
+                disabled
+                aria-disabled="true"
+              >
+                <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M3 4h14v2H3V4zm2 5h10v2H5V9zm2 5h6v2H7v-2z" />
+                </svg>
+                筛选(开发中)
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] text-slate-400"
+                disabled
+                aria-disabled="true"
+              >
+                <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                  <path d="M6 4h8v2H6V4zm-2 5h12v2H4V9zm2 5h8v2H6v-2z" />
+                </svg>
+                排序(开发中)
+              </button>
+            </div>
           </div>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>标题</TableHead>
-                <TableHead>类型</TableHead>
-                <TableHead>账单金额</TableHead>
-                <TableHead>已还</TableHead>
-                <TableHead>未结清</TableHead>
-                <TableHead>状态</TableHead>
+                <TableHead className="text-right">账单金额(元)</TableHead>
+                <TableHead className="text-right">已还(元)</TableHead>
+                <TableHead className="text-right">未结清(元)</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {transactionsQuery.isLoading && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-slate-500">
-                    加载中...
-                  </TableCell>
-                </TableRow>
-              )}
+              {transactionsQuery.isLoading &&
+                Array.from({ length: 3 }).map((_, index) => (
+                  <TableRow key={`loading-${index}`} className="animate-pulse">
+                    <TableCell colSpan={5}>
+                      <div className="flex items-center gap-3">
+                        <div className="h-4 w-28 rounded bg-slate-200" />
+                        <div className="h-4 w-20 rounded bg-slate-200" />
+                        <div className="h-4 flex-1 rounded bg-slate-200" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
               {transactionsQuery.isError && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-red-600">
+                  <TableCell colSpan={5} className="text-center text-red-600">
                     无法加载账单，请稍后重试
                   </TableCell>
                 </TableRow>
               )}
               {!transactionsQuery.isLoading && displayTransactions.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-slate-500">
-                    {activeTab === "pending" ? "暂无未结清账单" : "暂无账单记录"}
+                  <TableCell colSpan={5} className="text-center text-slate-500">
+                    <div className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-6 py-6">
+                      <p className="text-sm font-medium text-slate-600">
+                        {activeTab === "pending"
+                          ? "暂无未结清账单"
+                          : "暂无账单记录"}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        先记录一笔垫付，账单才会出现在这里
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={openTransactionDialog}
+                      >
+                        新增垫付
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               )}
@@ -664,60 +761,107 @@ export default function SettlementPage() {
                 const due = item.amount_out - item.amount_reimbursed
                 return (
                   <TableRow key={item.id}>
-                    <TableCell className="font-medium text-slate-900">
-                      {item.title}
+                    <TableCell className="min-w-[220px]">
+                      <div className="space-y-1">
+                        <div className="text-sm font-medium text-slate-900">
+                          {item.title}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          {item.category === "work" ? (
+                            <Badge className="border border-blue-200 bg-blue-50 text-blue-700">
+                              工作
+                            </Badge>
+                          ) : (
+                            <Badge className="border border-orange-200 bg-orange-50 text-orange-700">
+                              个人
+                            </Badge>
+                          )}
+                          <span className="text-slate-300">·</span>
+                          <span>{statusLabels[item.status]}</span>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          创建于 {dateFormatter.format(new Date(item.created_at))}
+                        </div>
+                      </div>
                     </TableCell>
-                    <TableCell>
-                      {item.category === "work" ? (
-                        <Badge className="border border-blue-200 bg-blue-50 text-blue-700">
-                          工作
-                        </Badge>
-                      ) : (
-                        <Badge className="border border-orange-200 bg-orange-50 text-orange-700">
-                          个人
-                        </Badge>
-                      )}
+                    <TableCell className="text-right">
+                      {currency.format(item.amount_out)}
                     </TableCell>
-                    <TableCell>{currency.format(item.amount_out)}</TableCell>
-                    <TableCell>{currency.format(item.amount_reimbursed)}</TableCell>
-                    <TableCell>{currency.format(due)}</TableCell>
-                    <TableCell>{statusLabels[item.status]}</TableCell>
+                    <TableCell className="text-right">
+                      {currency.format(item.amount_reimbursed)}
+                    </TableCell>
+                    <TableCell className="text-right">{currency.format(due)}</TableCell>
                     <TableCell className="text-right">
                       <div className="relative inline-flex items-center justify-end gap-2">
                         {item.status !== "settled" && (
-                          <Button onClick={() => openDialog(item)}>核销</Button>
+                          <Button size="sm" onClick={() => openDialog(item)}>
+                            去核销
+                          </Button>
                         )}
-                        <button
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition hover:bg-slate-100"
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="px-3"
                           onClick={(event) => {
                             event.stopPropagation()
                             setMenuOpenId((prev) => (prev === item.id ? null : item.id))
                           }}
+                          aria-haspopup="menu"
+                          aria-expanded={menuOpenId === item.id}
                         >
-                          ...
-                        </button>
+                          更多
+                          <svg
+                            className="ml-1 h-3 w-3"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                            aria-hidden="true"
+                          >
+                            <path d="M5.25 7.5 10 12.25 14.75 7.5" />
+                          </svg>
+                        </Button>
                         {menuOpenId === item.id && (
                           <div
-                            className="absolute right-0 top-11 z-10 w-32 rounded-md border border-slate-200 bg-white py-1 text-left shadow-md"
+                            className="absolute right-0 top-11 z-10 w-40 rounded-md border border-slate-200 bg-white py-2 text-left shadow-lg"
                             onClick={(event) => event.stopPropagation()}
                           >
+                            <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                              更多操作
+                            </div>
+                            <div className="my-1 h-px bg-slate-100" />
                             <button
-                              className="block w-full px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
                               onClick={() => {
                                 setMenuOpenId(null)
                                 openEditDialog(item)
                               }}
                             >
-                              编辑
+                              <svg
+                                className="h-4 w-4 text-slate-500"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                aria-hidden="true"
+                              >
+                                <path d="M13.586 3.586a2 2 0 0 1 2.828 2.828l-8.9 8.9-3.3.47.47-3.3 8.9-8.9z" />
+                              </svg>
+                              编辑账单
                             </button>
                             <button
-                              className="block w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                               onClick={() => {
                                 setMenuOpenId(null)
                                 openDeleteDialog(item)
                               }}
                             >
-                              删除
+                              <svg
+                                className="h-4 w-4 text-red-500"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                aria-hidden="true"
+                              >
+                                <path d="M6 7a1 1 0 0 1 1 1v7a1 1 0 1 1-2 0V8a1 1 0 0 1 1-1zm4 1a1 1 0 0 1 2 0v7a1 1 0 1 1-2 0V8z" />
+                                <path d="M4 5h12v1H4zM8 3h4a1 1 0 0 1 1 1v1H7V4a1 1 0 0 1 1-1z" />
+                              </svg>
+                              删除账单
                             </button>
                           </div>
                         )}
@@ -739,8 +883,8 @@ export default function SettlementPage() {
               选择回款并输入本次核销金额
             </DialogDescription>
           </DialogHeader>
-
-          <div className="space-y-4">
+          <div className="h-px bg-slate-200/70" />
+          <div className="space-y-4 rounded-[16px] border border-slate-200/70 bg-white/80 p-5">
             <div className="space-y-2">
               <p className="text-sm text-slate-500">账单</p>
               <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
@@ -805,7 +949,7 @@ export default function SettlementPage() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200/70 pt-5">
             <Button
               variant="secondary"
               onClick={() => setOpen(false)}
@@ -826,7 +970,8 @@ export default function SettlementPage() {
             <DialogTitle>我垫付了</DialogTitle>
             <DialogDescription>新增一笔垫付账单</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="h-px bg-slate-200/70" />
+          <div className="space-y-4 rounded-[16px] border border-slate-200/70 bg-white/80 p-5">
             <div className="space-y-2">
               <label className="text-sm text-slate-500">标题</label>
               <Input
@@ -882,7 +1027,7 @@ export default function SettlementPage() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200/70 pt-5">
             <Button
               variant="secondary"
               onClick={() => setTransactionOpen(false)}
@@ -903,10 +1048,11 @@ export default function SettlementPage() {
       <Dialog open={salaryOpen} onOpenChange={setSalaryOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>D登回款了</DialogTitle>
+            <DialogTitle>我回款了</DialogTitle>
             <DialogDescription>新增一笔回款进入资金池</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="h-px bg-slate-200/70" />
+          <div className="space-y-4 rounded-[16px] border border-slate-200/70 bg-white/80 p-5">
             <div className="space-y-2">
               <label className="text-sm text-slate-500">金额</label>
               <Input
@@ -976,7 +1122,7 @@ export default function SettlementPage() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200/70 pt-5">
             <Button
               variant="secondary"
               onClick={() => setSalaryOpen(false)}
@@ -997,60 +1143,91 @@ export default function SettlementPage() {
             <DialogTitle>资金池明细</DialogTitle>
             <DialogDescription>查看所有回款的使用情况</DialogDescription>
           </DialogHeader>
-          <div className="max-h-[60vh] overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>到账日期</TableHead>
-                  <TableHead>来源</TableHead>
-                  <TableHead>总金额</TableHead>
-                  <TableHead>已用</TableHead>
-                  <TableHead>剩余</TableHead>
-                  <TableHead>备注</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {salaryLogsAllQuery.isLoading && (
+          <div className="h-px bg-slate-200/70" />
+          <div className="rounded-[16px] border border-slate-200/70 bg-white/80 p-5">
+            <div className="max-h-[60vh] overflow-auto">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-slate-500">
-                      加载中...
-                    </TableCell>
+                    <TableHead>到账日期</TableHead>
+                    <TableHead>来源</TableHead>
+                    <TableHead className="text-right">总金额(元)</TableHead>
+                    <TableHead className="text-right">已用(元)</TableHead>
+                    <TableHead className="text-right">剩余(元)</TableHead>
+                    <TableHead>备注</TableHead>
                   </TableRow>
-                )}
-                {salaryLogsAllQuery.isError && (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center text-red-600">
-                      无法加载回款明细，请稍后重试
-                    </TableCell>
-                  </TableRow>
-                )}
-                {!salaryLogsAllQuery.isLoading &&
-                  (salaryLogsAllQuery.data ?? []).length === 0 && (
+                </TableHeader>
+                <TableBody>
+                  {salaryLogsAllQuery.isLoading &&
+                    Array.from({ length: 3 }).map((_, index) => (
+                      <TableRow key={`salary-loading-${index}`} className="animate-pulse">
+                        <TableCell colSpan={6}>
+                          <div className="flex items-center gap-3">
+                            <div className="h-4 w-24 rounded bg-slate-200" />
+                            <div className="h-4 w-16 rounded bg-slate-200" />
+                            <div className="h-4 flex-1 rounded bg-slate-200" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  {salaryLogsAllQuery.isError && (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-slate-500">
-                        暂无回款记录
+                      <TableCell colSpan={6} className="text-center text-red-600">
+                        无法加载回款明细，请稍后重试
                       </TableCell>
                     </TableRow>
                   )}
-                {(salaryLogsAllQuery.data ?? []).map((log) => {
-                  const usedAmount = log.amount - log.amount_unused
-                  return (
-                    <TableRow key={log.id}>
-                      <TableCell>
-                        {dateFormatter.format(new Date(log.received_date))}
-                      </TableCell>
-                      <TableCell>{sourceLabels[log.source]}</TableCell>
-                      <TableCell>{currency.format(log.amount)}</TableCell>
-                      <TableCell>{currency.format(usedAmount)}</TableCell>
-                      <TableCell>{currency.format(log.amount_unused)}</TableCell>
-                      <TableCell>{log.remark || "-"}</TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+                  {!salaryLogsAllQuery.isLoading &&
+                    (salaryLogsAllQuery.data ?? []).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center text-slate-500">
+                          <div className="mx-auto flex max-w-md flex-col items-center gap-2 rounded-[16px] border border-dashed border-slate-200 bg-slate-50 px-6 py-6">
+                            <p className="text-sm font-medium text-slate-600">
+                              暂无回款记录
+                            </p>
+                            <p className="text-xs text-slate-400">
+                              录入回款后，会显示在资金池明细中
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSalaryListOpen(false)
+                                openSalaryDialog()
+                              }}
+                            >
+                              新增回款
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  {(salaryLogsAllQuery.data ?? []).map((log) => {
+                    const usedAmount = log.amount - log.amount_unused
+                    return (
+                      <TableRow key={log.id}>
+                        <TableCell>
+                          {dateFormatter.format(new Date(log.received_date))}
+                        </TableCell>
+                        <TableCell>{sourceLabels[log.source]}</TableCell>
+                        <TableCell className="text-right">
+                          {currency.format(log.amount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {currency.format(usedAmount)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {currency.format(log.amount_unused)}
+                        </TableCell>
+                        <TableCell>{log.remark || "-"}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200/70 pt-5">
             <Button variant="secondary" onClick={() => setSalaryListOpen(false)}>
               关闭
             </Button>
@@ -1064,7 +1241,8 @@ export default function SettlementPage() {
             <DialogTitle>编辑账单</DialogTitle>
             <DialogDescription>修改标题或金额</DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="h-px bg-slate-200/70" />
+          <div className="space-y-4 rounded-[16px] border border-slate-200/70 bg-white/80 p-5">
             <div className="space-y-2">
               <label className="text-sm text-slate-500">标题</label>
               <Input
@@ -1120,7 +1298,7 @@ export default function SettlementPage() {
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t border-slate-200/70 pt-5">
             <Button
               variant="secondary"
               onClick={() => setEditOpen(false)}
@@ -1143,17 +1321,20 @@ export default function SettlementPage() {
               删除后无法恢复，请确认是否删除该账单。
             </DialogDescription>
           </DialogHeader>
-          {deletingTransaction && (
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-              {deletingTransaction.title} · {currency.format(deletingTransaction.amount_out)}
-            </div>
-          )}
-          {deleteError && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-              {deleteError}
-            </div>
-          )}
-          <DialogFooter>
+          <div className="h-px bg-slate-200/70" />
+          <div className="space-y-3 rounded-[16px] border border-slate-200/70 bg-white/80 p-5">
+            {deletingTransaction && (
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                {deletingTransaction.title} · {currency.format(deletingTransaction.amount_out)}
+              </div>
+            )}
+            {deleteError && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {deleteError}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="border-t border-slate-200/70 pt-5">
             <Button
               variant="secondary"
               onClick={() => setDeleteOpen(false)}
