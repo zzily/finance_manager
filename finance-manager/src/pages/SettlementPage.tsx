@@ -903,7 +903,7 @@ export default function SettlementPage() {
       <Dialog open={salaryOpen} onOpenChange={setSalaryOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>D登回款了</DialogTitle>
+            <DialogTitle>父亲回款了</DialogTitle>
             <DialogDescription>新增一笔回款进入资金池</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
