@@ -437,11 +437,11 @@ export default function SettlementPage() {
   })
 
   return (
-    <div className="min-h-screen bg-slate-100 p-6">
+    <div className="min-h-screen bg-slate-100 p-3 sm:p-6">
       {toast && (
-        <div className="fixed right-6 top-6 z-50">
+        <div className="fixed left-3 right-3 top-3 z-50 sm:left-auto sm:right-6 sm:top-6">
           <div
-            className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg transition ${
+            className={`flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-sm shadow-lg transition ${
               toast.type === "success"
                 ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                 : "border-red-200 bg-red-50 text-red-700"
@@ -464,7 +464,7 @@ export default function SettlementPage() {
           </div>
         </div>
       )}
-      <div className="mx-auto max-w-6xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-4 sm:space-y-6">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">核销页面</h1>
           <p className="text-sm text-slate-500">请选择未结清账单进行核销操作</p>
@@ -483,7 +483,7 @@ export default function SettlementPage() {
               }
             }}
           >
-            <div className="flex items-start justify-between">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
                   主KPI
@@ -512,7 +512,7 @@ export default function SettlementPage() {
           </div>
 
           <div className="rounded-[20px] border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:bg-white/80 hover:backdrop-blur-sm hover:ring-1 hover:ring-white/70 hover:shadow-[0_12px_30px_-20px_rgba(148,163,184,0.7)]">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
                 <h2 className="text-sm font-semibold text-slate-900">记账入口</h2>
                 <p className="text-xs text-slate-500">录入你的垫付与回款</p>
@@ -653,8 +653,8 @@ export default function SettlementPage() {
         </div>
 
         <div className="rounded-[20px] border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
               <button
                 className={`rounded-full px-3 py-1 text-xs font-medium transition ${
                   activeTab === "pending"
@@ -676,7 +676,7 @@ export default function SettlementPage() {
                 全部/历史记录
               </button>
             </div>
-            <div className="flex items-center gap-2 text-xs text-slate-500">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
               <span>
                 {activeTab === "pending" ? "仅显示未结清账单" : "展示全部账单记录"}
               </span>
@@ -704,7 +704,8 @@ export default function SettlementPage() {
               </button>
             </div>
           </div>
-          <Table>
+          <div className="overflow-x-auto">
+            <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
                 <TableHead>标题</TableHead>
@@ -871,7 +872,8 @@ export default function SettlementPage() {
                 )
               })}
             </TableBody>
-          </Table>
+            </Table>
+          </div>
         </div>
       </div>
 
