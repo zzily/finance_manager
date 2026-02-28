@@ -45,13 +45,42 @@ export type SettleRequest = {
   amount: number
 }
 
+export type SettlementDetail = {
+  id: number
+  transaction_id: number
+  salary_log_id: number
+  amount: number
+  salary_month: string
+  salary_source: "salary" | "reimbursement" | "other"
+  created_at: string
+}
+
 export type ApiResponse<T = unknown> = {
   code: number
   message: string
   data: T
 }
 
+export type MonthlyData = {
+  month: string
+  income_salary: number
+  income_reimbursement: number
+  spending_work: number
+  spending_personal: number
+}
+
+export type CategoryBreakdown = {
+  name: string
+  value: number
+}
+
+export type ChartData = {
+  monthly_timeline: MonthlyData[]
+  category_breakdown: CategoryBreakdown[]
+}
+
 export type SummaryData = {
+  chart_data: ChartData
   financial_status: {
     description: string
     business_loop: {

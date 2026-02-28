@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
@@ -22,13 +22,17 @@ export function EditTransactionDialog({
   const [form, setForm] = useState<TransactionUpdate>({ title: "", amount_out: 0, category: "work" })
   const [error, setError] = useState<string | null>(null)
 
-  function handleOpenChange(v: boolean) {
-    if (v && transaction) {
-      setForm({ title: transaction.title, amount_out: transaction.amount_out, category: transaction.category })
+  /* Pre-fill form when dialog opens with transaction data */
+  useEffect(() => {
+    if (open && transaction) {
+      setForm({
+        title: transaction.title,
+        amount_out: transaction.amount_out,
+        category: transaction.category,
+      })
       setError(null)
     }
-    onOpenChange(v)
-  }
+  }, [open, transaction])
 
   function handleSubmit() {
     if (!transaction) return
@@ -40,7 +44,7 @@ export function EditTransactionDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>编辑账单</DialogTitle>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react"
+﻿import { useMemo, useState } from "react"
 import { Wallet, Plus, ArrowDownCircle } from "lucide-react"
 import { Button } from "../components/ui/button"
 import { useTransactions } from "../hooks/useTransactions"
@@ -8,6 +8,7 @@ import { BalanceCard, TotalAssetsCard } from "../components/dashboard/MetricCard
 import { BusinessLoopCard } from "../components/dashboard/BusinessLoopCard"
 import { FamilyLoopCard } from "../components/dashboard/FamilyLoopCard"
 import { OperationBar } from "../components/dashboard/OperationBar"
+import { MonthlyTrendChart, CategoryPieChart } from "../components/dashboard/Charts"
 import { TransactionTable } from "../components/transaction/TransactionTable"
 import { MobileTransactionCard } from "../components/transaction/MobileTransactionCard"
 import { MobileCardSkeleton, EmptyState } from "../components/common"
@@ -17,6 +18,7 @@ import { SalaryLogDialog } from "../components/dialogs/SalaryLogDialog"
 import { EditTransactionDialog } from "../components/dialogs/EditTransactionDialog"
 import { DeleteConfirmDialog } from "../components/dialogs/DeleteConfirmDialog"
 import { SalaryPoolDialog } from "../components/dialogs/SalaryPoolDialog"
+import { SettlementHistoryDialog } from "../components/dialogs/SettlementHistoryDialog"
 import type { Transaction } from "../types"
 
 export default function SettlementPage() {
@@ -31,11 +33,13 @@ export default function SettlementPage() {
   const [editOpen, setEditOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [poolOpen, setPoolOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
 
   /* selection state */
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null)
   const [editingTxn, setEditingTxn] = useState<Transaction | null>(null)
   const [deletingTxn, setDeletingTxn] = useState<Transaction | null>(null)
+  const [historyTxn, setHistoryTxn] = useState<Transaction | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"pending" | "history">("pending")
 
@@ -48,6 +52,7 @@ export default function SettlementPage() {
   function openSettle(t: Transaction) { setSelectedTxn(t); setSettleOpen(true) }
   function openEdit(t: Transaction) { setEditingTxn(t); setEditOpen(true) }
   function openDelete(t: Transaction) { setDeletingTxn(t); setDeleteError(null); setDeleteOpen(true) }
+  function openHistory(t: Transaction) { setHistoryTxn(t); setHistoryOpen(true) }
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -87,7 +92,15 @@ export default function SettlementPage() {
           <FamilyLoopCard isLoading={summary.isLoading} loop={summary.familyLoop} netSavings={summary.netSavings} personalSpending={summary.personalSpending} />
         </div>
 
-        {/* Row 3: Operation Bar */}
+        {/* Row 3: Charts */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="md:col-span-2">
+            <MonthlyTrendChart data={summary.chartData} isLoading={summary.isLoading} />
+          </div>
+          <CategoryPieChart data={summary.chartData} isLoading={summary.isLoading} />
+        </div>
+
+        {/* Row 4: Operation Bar */}
         <OperationBar isLoading={summary.isLoading} billsPending={summary.billsPending} availableBalance={summary.availableBalance} actionNeeded={summary.actionNeeded} />
 
         {/* Row 4: Bills */}
@@ -120,6 +133,7 @@ export default function SettlementPage() {
               onSettle={openSettle}
               onEdit={openEdit}
               onDelete={openDelete}
+              onHistory={openHistory}
               onAdd={() => setTxnDialogOpen(true)}
             />
           </div>
@@ -130,7 +144,7 @@ export default function SettlementPage() {
             {txns.query.isError && <div className="py-10 text-center text-sm text-red-500">无法加载账单，请稍后重试</div>}
             {!txns.query.isLoading && displayList.length === 0 && <EmptyState tab={activeTab} onAdd={() => setTxnDialogOpen(true)} />}
             {displayList.map((item) => (
-              <MobileTransactionCard key={item.id} item={item} onSettle={openSettle} onEdit={openEdit} onDelete={openDelete} />
+              <MobileTransactionCard key={item.id} item={item} onSettle={openSettle} onEdit={openEdit} onDelete={openDelete} onHistory={openHistory} />
             ))}
           </div>
         </div>
@@ -172,6 +186,9 @@ export default function SettlementPage() {
       <SalaryPoolDialog
         open={poolOpen} onOpenChange={setPoolOpen}
         data={salary.allLogs} isLoading={salary.allQuery.isLoading} isError={salary.allQuery.isError}
+      />
+      <SettlementHistoryDialog
+        open={historyOpen} onOpenChange={setHistoryOpen} transaction={historyTxn}
       />
     </div>
   )

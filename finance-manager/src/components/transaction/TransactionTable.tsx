@@ -1,4 +1,4 @@
-import { Zap, MoreHorizontal, Pencil, Trash2 } from "lucide-react"
+import { Zap, MoreHorizontal, Pencil, Trash2, History } from "lucide-react"
 import { Button } from "../ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "../ui/dropdown-menu"
@@ -14,6 +14,7 @@ export function TransactionTable({
   onSettle,
   onEdit,
   onDelete,
+  onHistory,
   onAdd,
 }: {
   data: Transaction[]
@@ -23,6 +24,7 @@ export function TransactionTable({
   onSettle: (t: Transaction) => void
   onEdit: (t: Transaction) => void
   onDelete: (t: Transaction) => void
+  onHistory: (t: Transaction) => void
   onAdd: () => void
 }) {
   return (
@@ -78,6 +80,11 @@ export function TransactionTable({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      {item.amount_reimbursed > 0 && (
+                        <DropdownMenuItem onClick={() => onHistory(item)}>
+                          <History size={14} className="text-slate-500" />核销记录
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuItem onClick={() => onEdit(item)}>
                         <Pencil size={14} className="text-slate-500" />编辑
                       </DropdownMenuItem>

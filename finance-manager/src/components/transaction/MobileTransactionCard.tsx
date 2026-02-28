@@ -1,4 +1,4 @@
-import { Zap, Pencil, Trash2 } from "lucide-react"
+import { Zap, Pencil, Trash2, History } from "lucide-react"
 import { Button } from "../ui/button"
 import { currency } from "../../lib/formatters"
 import { StatusBadge, CategoryBadge } from "../common"
@@ -9,11 +9,13 @@ export function MobileTransactionCard({
   onSettle,
   onEdit,
   onDelete,
+  onHistory,
 }: {
   item: Transaction
   onSettle: (t: Transaction) => void
   onEdit: (t: Transaction) => void
   onDelete: (t: Transaction) => void
+  onHistory: (t: Transaction) => void
 }) {
   const due = item.amount_out - item.amount_reimbursed
   return (
@@ -43,6 +45,11 @@ export function MobileTransactionCard({
         {item.status !== "settled" && (
           <Button size="sm" variant="outline" className="flex-1" onClick={() => onSettle(item)}>
             <Zap size={13} />核销
+          </Button>
+        )}
+        {item.amount_reimbursed > 0 && (
+          <Button size="sm" variant="ghost" className="text-slate-500" onClick={() => onHistory(item)}>
+            <History size={13} />
           </Button>
         )}
         <Button size="sm" variant="ghost" className="text-slate-500" onClick={() => onEdit(item)}>

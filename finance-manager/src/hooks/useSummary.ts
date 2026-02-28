@@ -37,5 +37,6 @@ export function useSummary() {
     totalAssets,
     billsPending,
     actionNeeded,
+    chartData: data?.chart_data ?? null,
   }
 }
