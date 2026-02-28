@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
+import { MonthPicker } from "../ui/month-picker"
 import { ErrorBox } from "../common"
 import type { SalaryLogCreate } from "../../types"
 
@@ -50,7 +51,7 @@ export function SalaryLogDialog({
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-500">回款月份</label>
-            <Input type="month" value={form.month} onChange={(e) => setForm((p) => ({ ...p, month: e.target.value }))} />
+            <MonthPicker value={form.month} onChange={(v) => setForm((p) => ({ ...p, month: v }))} placeholder="选择回款月份" />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-500">来源</label>
