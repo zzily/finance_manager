@@ -45,7 +45,13 @@ export type SettleRequest = {
   amount: number
 }
 
-export type SummaryResponse = {
+export type ApiResponse<T = unknown> = {
+  code: number
+  message: string
+  data: T
+}
+
+export type SummaryData = {
   financial_status: {
     description: string
     business_loop: {
