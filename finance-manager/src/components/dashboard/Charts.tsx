@@ -135,7 +135,7 @@ export function CategoryPieChart({ data, isLoading }: { data: ChartData | null; 
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => currency.format(value)}
+                formatter={(value) => currency.format(Number(value))}
                 contentStyle={{ borderRadius: 8, fontSize: 12, border: "1px solid #e2e8f0" }}
               />
             </PieChart>

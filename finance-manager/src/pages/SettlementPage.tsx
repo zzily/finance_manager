@@ -18,8 +18,9 @@ import { SalaryLogDialog } from "../components/dialogs/SalaryLogDialog"
 import { EditTransactionDialog } from "../components/dialogs/EditTransactionDialog"
 import { DeleteConfirmDialog } from "../components/dialogs/DeleteConfirmDialog"
 import { SalaryPoolDialog } from "../components/dialogs/SalaryPoolDialog"
+import { EditSalaryLogDialog } from "../components/dialogs/EditSalaryLogDialog"
 import { SettlementHistoryDialog } from "../components/dialogs/SettlementHistoryDialog"
-import type { Transaction } from "../types"
+import type { Transaction, SalaryLog } from "../types"
 
 export default function SettlementPage() {
   const txns = useTransactions()
@@ -34,12 +35,14 @@ export default function SettlementPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [poolOpen, setPoolOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
+  const [editSalaryOpen, setEditSalaryOpen] = useState(false)
 
   /* selection state */
   const [selectedTxn, setSelectedTxn] = useState<Transaction | null>(null)
   const [editingTxn, setEditingTxn] = useState<Transaction | null>(null)
   const [deletingTxn, setDeletingTxn] = useState<Transaction | null>(null)
   const [historyTxn, setHistoryTxn] = useState<Transaction | null>(null)
+  const [editingSalaryLog, setEditingSalaryLog] = useState<SalaryLog | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"pending" | "history">("pending")
 
@@ -186,6 +189,14 @@ export default function SettlementPage() {
       <SalaryPoolDialog
         open={poolOpen} onOpenChange={setPoolOpen}
         data={salary.allLogs} isLoading={salary.allQuery.isLoading} isError={salary.allQuery.isError}
+        isDeleting={salary.remove.isPending}
+        onEdit={(log) => { setEditingSalaryLog(log); setEditSalaryOpen(true) }}
+        onDelete={(id) => salary.remove.mutate(id)}
+      />
+      <EditSalaryLogDialog
+        open={editSalaryOpen} onOpenChange={setEditSalaryOpen} salaryLog={editingSalaryLog}
+        isPending={salary.update.isPending}
+        onSubmit={(id, payload) => salary.update.mutate({ id, payload }, { onSuccess: () => setEditSalaryOpen(false) })}
       />
       <SettlementHistoryDialog
         open={historyOpen} onOpenChange={setHistoryOpen} transaction={historyTxn}

@@ -37,6 +37,15 @@ export type SalaryLogCreate = {
   month: string
   source: "salary" | "reimbursement" | "other"
   remark?: string | null
+  received_date?: string | null
+}
+
+export type SalaryLogUpdate = {
+  amount: number
+  source: "salary" | "reimbursement" | "other"
+  month: string
+  remark?: string | null
+  received_date?: string | null
 }
 
 export type SettleRequest = {
