@@ -11,6 +11,7 @@ import {
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
+import { MonthPicker } from "../ui/month-picker"
 import { ErrorBox } from "../common"
 import { currency } from "../../lib/formatters"
 import type { SalaryLog, SalaryLogUpdate } from "../../types"
@@ -110,10 +111,10 @@ export function EditSalaryLogDialog({
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-slate-500">归属月份</label>
-            <Input
-              type="month"
+            <MonthPicker
               value={form.month}
-              onChange={(e) => setForm((p) => ({ ...p, month: e.target.value }))}
+              onChange={(v) => setForm((p) => ({ ...p, month: v }))}
+              placeholder="选择归属月份"
             />
           </div>
           <div className="space-y-1.5">
