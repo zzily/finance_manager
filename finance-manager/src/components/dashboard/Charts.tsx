@@ -118,7 +118,7 @@ export function CategoryPieChart({ data, isLoading }: { data: ChartData | null; 
       <div className="px-5 py-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">支出构成</p>
         <p className="mt-0.5 text-xs text-slate-400">工作垫付 vs 个人消费</p>
-        <div className="mt-4 h-[260px]">
+        <div className="relative mt-4 h-[260px]">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -129,8 +129,6 @@ export function CategoryPieChart({ data, isLoading }: { data: ChartData | null; 
                 outerRadius={90}
                 paddingAngle={3}
                 dataKey="value"
-                label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                labelLine={{ stroke: "#cbd5e1", strokeWidth: 1 }}
               >
                 {breakdown.map((_, i) => (
                   <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
@@ -142,6 +140,13 @@ export function CategoryPieChart({ data, isLoading }: { data: ChartData | null; 
               />
             </PieChart>
           </ResponsiveContainer>
+          {/* Center label inside donut */}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-[11px] text-slate-400">总支出</p>
+              <p className="text-base font-bold tabular-nums text-slate-900">{currency.format(total)}</p>
+            </div>
+          </div>
         </div>
         {/* Legend below chart */}
         <div className="mt-2 flex flex-wrap justify-center gap-4">
@@ -150,6 +155,7 @@ export function CategoryPieChart({ data, isLoading }: { data: ChartData | null; 
               <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }} />
               <span>{item.name}</span>
               <span className="tabular-nums font-medium text-slate-900">{currency.format(item.value)}</span>
+              <span className="text-slate-400">{total > 0 ? `${((item.value / total) * 100).toFixed(0)}%` : ""}</span>
             </div>
           ))}
         </div>
