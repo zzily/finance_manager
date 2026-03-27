@@ -2,14 +2,18 @@ import { useQuery } from "@tanstack/react-query"
 import { api, unwrapResponseData } from "../lib/api"
 import type { ApiResponse, SummaryData } from "../types"
 
-async function fetchSummary(): Promise<SummaryData> {
-  return unwrapResponseData(api.get<ApiResponse<SummaryData>>("/summary"))
+async function fetchSummary(month?: string): Promise<SummaryData> {
+  return unwrapResponseData(
+    api.get<ApiResponse<SummaryData>>("/summary", {
+      params: month ? { month } : undefined,
+    }),
+  )
 }
 
-export function useSummary() {
+export function useSummary(month?: string) {
   const query = useQuery({
-    queryKey: ["summary"],
-    queryFn: fetchSummary,
+    queryKey: ["summary", month ?? "all"],
+    queryFn: () => fetchSummary(month),
   })
 
   const data = query.data

@@ -11,6 +11,8 @@ import { useSalaryLogs } from "../hooks/useSalaryLogs"
 import { useTransactions } from "../hooks/useTransactions"
 import type { AppView } from "../layouts/appShell.types"
 import type { SalaryLog, Transaction } from "../types"
+import { SettlementDialogs } from "./SettlementDialogs"
+import { useSettlementPageState } from "./useSettlementPageState"
 
 function getRemainingDebt(transaction: Transaction) {
   return transaction.amount_out - transaction.amount_reimbursed
@@ -38,15 +40,12 @@ function getRecommendedSalaryLog(
 
 export function SettlementWorkbenchPage({
   onNavigate,
-  onOpenSalaryDialog,
-  onOpenTransactionDialog,
 }: {
   onNavigate: (view: AppView) => void
-  onOpenSalaryDialog: () => void
-  onOpenTransactionDialog: () => void
 }) {
   const transactions = useTransactions()
   const salary = useSalaryLogs()
+  const pageState = useSettlementPageState(transactions.all, transactions.unsettled)
 
   const queue = useMemo(
     () =>
@@ -154,11 +153,11 @@ export function SettlementWorkbenchPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={onOpenTransactionDialog}>
+          <Button variant="outline" onClick={() => pageState.setTxnDialogOpen(true)}>
             <Plus size={15} />
             去记录账单
           </Button>
-          <Button variant="outline" onClick={onOpenSalaryDialog}>
+          <Button variant="outline" onClick={() => pageState.setSalaryDialogOpen(true)}>
             <ArrowDownCircle size={15} />
             去录入回款
           </Button>
@@ -413,6 +412,8 @@ export function SettlementWorkbenchPage({
           </div>
         </div>
       </section>
+
+      <SettlementDialogs pageState={pageState} salary={salary} transactions={transactions} />
     </div>
   )
 }

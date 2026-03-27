@@ -1,20 +1,59 @@
-import { ArrowRight, Sparkles, TrendingUp, Wallet } from "lucide-react"
+import { useMemo, useState } from "react"
+
+import { ArrowRight, CalendarDays, Sparkles, TrendingUp, Wallet } from "lucide-react"
 
 import { BusinessLoopCard } from "../components/dashboard/BusinessLoopCard"
 import { CategoryPieChart, MonthlyTrendChart } from "../components/dashboard/Charts"
 import { FamilyLoopCard } from "../components/dashboard/FamilyLoopCard"
 import { BalanceCard, TotalAssetsCard } from "../components/dashboard/MetricCards"
 import { Button } from "../components/ui/button"
+import { MonthPicker } from "../components/ui/month-picker"
+import { useSalaryLogs } from "../hooks/useSalaryLogs"
 import { useSummary } from "../hooks/useSummary"
+import { useTransactions } from "../hooks/useTransactions"
 import type { AppView } from "../layouts/appShell.types"
 import { currency } from "../lib/formatters"
+
+function getCurrentMonthKey() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, "0")
+  return `${now.getFullYear()}-${month}`
+}
+
+function formatMonthLabel(month: string) {
+  const [year, monthNumber] = month.split("-")
+  return `${year} 年 ${Number(monthNumber)} 月`
+}
 
 export function MonthlyReviewPage({
   onNavigate,
 }: {
   onNavigate: (view: AppView) => void
 }) {
-  const summary = useSummary()
+  const transactions = useTransactions()
+  const salary = useSalaryLogs()
+  const [preferredMonth, setPreferredMonth] = useState("")
+
+  const availableMonths = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...transactions.all.map((transaction) => transaction.created_at.slice(0, 7)),
+          ...salary.allLogs.map((log) => log.month),
+        ]),
+      )
+        .filter(Boolean)
+        .sort((left, right) => right.localeCompare(left)),
+    [salary.allLogs, transactions.all],
+  )
+  const selectedMonth = useMemo(() => {
+    if (preferredMonth) {
+      return preferredMonth
+    }
+    return availableMonths[0] ?? getCurrentMonthKey()
+  }, [availableMonths, preferredMonth])
+
+  const summary = useSummary(selectedMonth)
   const categoryBreakdown = summary.chartData?.category_breakdown ?? []
   const topCategory = [...categoryBreakdown].sort((left, right) => right.value - left.value)[0]
   const businessCoverage =
@@ -33,13 +72,43 @@ export function MonthlyReviewPage({
             用复盘视角看账本，而不只是看余额
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-500">
-            这是复盘页的第一版，先复用现有 summary 数据，把收支走势、回款覆盖率和支出重点拉出来，后续再接月份切换与导出。
+            复盘页现在已经支持按月份查看 summary 结果。你可以切换月份观察当期回款覆盖率、净结余和支出重点，再决定是否回到账单中心追查明细。
           </p>
         </div>
-        <Button onClick={() => onNavigate("transactions")}>
-          去账单中心细看明细
-          <ArrowRight size={15} />
-        </Button>
+        <div className="flex flex-col gap-3 sm:min-w-[280px]">
+          <MonthPicker
+            value={selectedMonth}
+            onChange={(value) => setPreferredMonth(value)}
+            placeholder="选择要复盘的月份"
+          />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setPreferredMonth("")}>
+              使用最新月份
+            </Button>
+            <Button onClick={() => onNavigate("transactions")}>
+              去账单中心细看明细
+              <ArrowRight size={15} />
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-card lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+            Selected month
+          </p>
+          <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+            {formatMonthLabel(selectedMonth)}
+          </h3>
+          <p className="mt-1 text-sm text-slate-500">
+            当前卡片和图表都按这个月份过滤，方便做单月复盘。
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
+          <CalendarDays size={16} className="text-slate-400" />
+          可选月份 {availableMonths.length > 0 ? availableMonths.length : 1} 个
+        </div>
       </section>
 
       <div className="grid gap-4 md:grid-cols-2">

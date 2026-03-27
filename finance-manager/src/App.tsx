@@ -43,13 +43,7 @@ function App() {
       case "transactions":
         return <TransactionsPage onNavigate={handleViewChange} />
       case "workbench":
-        return (
-          <SettlementWorkbenchPage
-            onNavigate={handleViewChange}
-            onOpenSalaryDialog={() => handleViewChange("dashboard")}
-            onOpenTransactionDialog={() => handleViewChange("transactions")}
-          />
-        )
+        return <SettlementWorkbenchPage onNavigate={handleViewChange} />
       case "review":
         return <MonthlyReviewPage onNavigate={handleViewChange} />
       case "dashboard":
