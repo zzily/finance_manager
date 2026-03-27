@@ -1,18 +1,25 @@
 import { useMemo, useState } from "react"
 
-import { ArrowRight, CalendarDays, Sparkles, TrendingUp, Wallet } from "lucide-react"
+import { ArrowRight, CalendarDays, ChevronDown, Sparkles, TrendingUp, Wallet } from "lucide-react"
 
 import { BusinessLoopCard } from "../components/dashboard/BusinessLoopCard"
 import { CategoryPieChart, MonthlyTrendChart } from "../components/dashboard/Charts"
 import { FamilyLoopCard } from "../components/dashboard/FamilyLoopCard"
 import { BalanceCard, TotalAssetsCard } from "../components/dashboard/MetricCards"
 import { Button } from "../components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu"
 import { MonthPicker } from "../components/ui/month-picker"
 import { useSalaryLogs } from "../hooks/useSalaryLogs"
 import { useSummary } from "../hooks/useSummary"
 import { useTransactions } from "../hooks/useTransactions"
 import type { AppView } from "../layouts/appShell.types"
 import { currency } from "../lib/formatters"
+import { getReviewMonthVisibility } from "./monthlyReviewMonths"
 
 function getCurrentMonthKey() {
   const now = new Date()
@@ -52,6 +59,10 @@ export function MonthlyReviewPage({
     }
     return availableMonths[0] ?? getCurrentMonthKey()
   }, [availableMonths, preferredMonth])
+  const monthVisibility = useMemo(
+    () => getReviewMonthVisibility(availableMonths, selectedMonth),
+    [availableMonths, selectedMonth],
+  )
 
   const summary = useSummary(selectedMonth)
   const categoryBreakdown = summary.chartData?.category_breakdown ?? []
@@ -108,10 +119,10 @@ export function MonthlyReviewPage({
         <div className="rounded-2xl bg-slate-50 px-4 py-3">
           <div className="flex items-center gap-2 text-sm text-slate-500">
             <CalendarDays size={16} className="text-slate-400" />
-            <span>有数据月份 {availableMonths.length > 0 ? availableMonths.length : 1} 个</span>
+            <span>有数据月份 {monthVisibility.totalDataMonths} 个</span>
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            {(availableMonths.length > 0 ? availableMonths : [selectedMonth]).map((month) => {
+            {monthVisibility.quickMonths.map((month) => {
               const isActive = month === selectedMonth
 
               return (
@@ -129,6 +140,31 @@ export function MonthlyReviewPage({
                 </button>
               )
             })}
+            {monthVisibility.overflowMonths.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full px-3 text-xs font-medium text-slate-600"
+                  >
+                    更多月份
+                    <ChevronDown size={14} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="max-h-72 w-44 overflow-y-auto">
+                  {monthVisibility.overflowMonths.map((month) => (
+                    <DropdownMenuItem
+                      key={month}
+                      onSelect={() => setPreferredMonth(month)}
+                      className={month === selectedMonth ? "bg-slate-100 font-semibold text-slate-900" : undefined}
+                    >
+                      {formatMonthLabel(month)}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
       </section>
