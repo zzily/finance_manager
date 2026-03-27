@@ -70,6 +70,10 @@ export type ApiResponse<T = unknown> = {
   data: T
 }
 
+export type IdPayload = {
+  id: number
+}
+
 export type MonthlyData = {
   month: string
   income_salary: number

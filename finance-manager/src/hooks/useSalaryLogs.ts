@@ -1,31 +1,40 @@
 import { useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { api } from "../lib/api"
-import type { ApiResponse, SalaryLog, SalaryLogCreate, SalaryLogUpdate, SettleRequest } from "../types"
+import { api, getApiErrorMessage, unwrapResponseData } from "../lib/api"
+import type {
+  ApiResponse,
+  IdPayload,
+  SalaryLog,
+  SalaryLogCreate,
+  SalaryLogUpdate,
+  SettleRequest,
+} from "../types"
 
 async function fetchAvailable() {
-  return (await api.get<SalaryLog[]>("/salary_logs/", { params: { available_only: true } })).data
+  return unwrapResponseData(
+    api.get<ApiResponse<SalaryLog[]>>("/salary_logs/", { params: { available_only: true } }),
+  )
 }
 
 async function fetchAll() {
-  return (await api.get<SalaryLog[]>("/salary_logs/")).data
+  return unwrapResponseData(api.get<ApiResponse<SalaryLog[]>>("/salary_logs/"))
 }
 
 async function createSalaryLogApi(p: SalaryLogCreate) {
-  return (await api.post<ApiResponse<{ id: number }>>("/salary_logs/", p)).data
+  return unwrapResponseData(api.post<ApiResponse<IdPayload>>("/salary_logs/", p))
 }
 
 async function updateSalaryLogApi({ id, payload }: { id: number; payload: SalaryLogUpdate }) {
-  return (await api.put<SalaryLog>(`/salary_logs/${id}`, payload)).data
+  return unwrapResponseData(api.put<ApiResponse<SalaryLog>>(`/salary_logs/${id}`, payload))
 }
 
 async function deleteSalaryLogApi(id: number) {
-  return (await api.delete<ApiResponse>(`/salary_logs/${id}`)).data
+  return unwrapResponseData(api.delete<ApiResponse<IdPayload>>(`/salary_logs/${id}`))
 }
 
 async function settleDebtApi(p: SettleRequest) {
-  return (await api.post<ApiResponse>("/settle", p)).data
+  return unwrapResponseData(api.post<ApiResponse>("/settle", p))
 }
 
 export function useSalaryLogs() {
@@ -54,7 +63,9 @@ export function useSalaryLogs() {
       await invalidateAll()
       toast.success("回款已录入", { description: "资金池已更新" })
     },
-    onError: () => toast.error("新增回款失败，请稍后重试"),
+    onError: (error) => {
+      toast.error("新增回款失败", { description: getApiErrorMessage(error, "请稍后重试") })
+    },
   })
 
   const updateMutation = useMutation({
@@ -63,9 +74,8 @@ export function useSalaryLogs() {
       await invalidateAll()
       toast.success("回款已更新", { description: "资金池已同步" })
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.detail ?? "更新失败，请稍后重试"
-      toast.error("更新失败", { description: msg })
+    onError: (error) => {
+      toast.error("更新失败", { description: getApiErrorMessage(error, "请稍后重试") })
     },
   })
 
@@ -75,9 +85,8 @@ export function useSalaryLogs() {
       await invalidateAll()
       toast.success("回款记录已删除")
     },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.detail ?? "删除失败，请稍后重试"
-      toast.error("删除失败", { description: msg })
+    onError: (error) => {
+      toast.error("删除失败", { description: getApiErrorMessage(error, "请稍后重试") })
     },
   })
 
@@ -86,6 +95,9 @@ export function useSalaryLogs() {
     onSuccess: async () => {
       await invalidateAll()
       toast.success("核销成功", { description: "账单已更新" })
+    },
+    onError: (error) => {
+      toast.error("核销失败", { description: getApiErrorMessage(error, "请稍后重试") })
     },
   })
 
@@ -105,3 +117,5 @@ export function useSalaryLogs() {
     settle: settleMutation,
   }
 }
+
+export type SalaryLogsState = ReturnType<typeof useSalaryLogs>

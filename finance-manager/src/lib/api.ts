@@ -1,4 +1,6 @@
-import axios, { type InternalAxiosRequestConfig } from "axios"
+import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from "axios"
+
+import type { ApiResponse } from "../types"
 
 // API 环境配置
 export const API_ENDPOINTS = [
@@ -18,7 +20,9 @@ function loadSavedEndpoint(): number {
       const idx = API_ENDPOINTS.findIndex((e) => e.key === saved)
       if (idx !== -1) return idx
     }
-  } catch {}
+  } catch {
+    // Ignore storage access errors and fall back to the default endpoint.
+  }
   return 0
 }
 
@@ -68,6 +72,32 @@ export const api = axios.create({
   timeout: 10000,
 })
 
+type ApiRequest<T> = Promise<AxiosResponse<ApiResponse<T>>>
+type ApiErrorPayload = Partial<ApiResponse<unknown>> & { detail?: string }
+
+export async function unwrapResponseData<T>(request: ApiRequest<T>): Promise<T> {
+  const response = await request
+  return response.data.data
+}
+
+export function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (!axios.isAxiosError<ApiErrorPayload>(error)) {
+    return fallback
+  }
+
+  const data = error.response?.data
+  if (typeof data?.message === "string" && data.message) {
+    return data.message
+  }
+  if (typeof data?.detail === "string" && data.detail) {
+    return data.detail
+  }
+  if (typeof error.message === "string" && error.message) {
+    return error.message
+  }
+  return fallback
+}
+
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   config.baseURL = getCurrentBaseURL()
   return config
@@ -77,6 +107,9 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const config = error.config
+    if (!config) {
+      return Promise.reject(error)
+    }
 
     if (!config._retryApiIndex) {
       config._retryApiIndex = currentApiIndex

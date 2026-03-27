@@ -18,11 +18,15 @@ import {
 export function ApiSwitcher() {
   const [activeIndex, setActiveIndex] = useState(getCurrentApiIndex)
   const [isOpen, setIsOpen] = useState(false)
-  const [status, setStatus] = useState<"checking" | "online" | "offline">("checking")
+  const [healthCheck, setHealthCheck] = useState<{
+    status: "online" | "offline"
+    url: string
+  } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const queryClient = useQueryClient()
 
   const current = API_ENDPOINTS[activeIndex]
+  const status = healthCheck?.url === current.url ? healthCheck.status : "checking"
 
   // Subscribe to api layer changes (auto-failover sync)
   useEffect(() => {
@@ -32,12 +36,19 @@ export function ApiSwitcher() {
   // Health check on mount & endpoint change
   useEffect(() => {
     let cancelled = false
-    setStatus("checking")
 
     const controller = new AbortController()
     fetch(`${current.url}/docs`, { method: "HEAD", signal: controller.signal })
-      .then(() => { if (!cancelled) setStatus("online") })
-      .catch(() => { if (!cancelled) setStatus("offline") })
+      .then(() => {
+        if (!cancelled) {
+          setHealthCheck({ status: "online", url: current.url })
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHealthCheck({ status: "offline", url: current.url })
+        }
+      })
 
     return () => { cancelled = true; controller.abort() }
   }, [current.url])
