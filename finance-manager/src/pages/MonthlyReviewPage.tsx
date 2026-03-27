@@ -105,9 +105,31 @@ export function MonthlyReviewPage({
             当前卡片和图表都按这个月份过滤，方便做单月复盘。
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-500">
-          <CalendarDays size={16} className="text-slate-400" />
-          可选月份 {availableMonths.length > 0 ? availableMonths.length : 1} 个
+        <div className="rounded-2xl bg-slate-50 px-4 py-3">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <CalendarDays size={16} className="text-slate-400" />
+            <span>有数据月份 {availableMonths.length > 0 ? availableMonths.length : 1} 个</span>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(availableMonths.length > 0 ? availableMonths : [selectedMonth]).map((month) => {
+              const isActive = month === selectedMonth
+
+              return (
+                <button
+                  key={month}
+                  type="button"
+                  onClick={() => setPreferredMonth(month)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    isActive
+                      ? "border-slate-950 bg-slate-950 text-white"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
+                  }`}
+                >
+                  {formatMonthLabel(month)}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </section>
 
