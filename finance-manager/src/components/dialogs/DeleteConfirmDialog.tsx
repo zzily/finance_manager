@@ -35,7 +35,13 @@ export function DeleteConfirmDialog({
         {error && <ErrorBox msg={error} />}
         <DialogFooter>
           <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>取消</Button>
-          <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
+          <Button
+            variant="destructive"
+            onClick={onConfirm}
+            disabled={isPending}
+            data-testid="confirm-delete-transaction"
+            aria-label="confirm-delete-transaction"
+          >
             {isPending ? "删除中..." : "确认删除"}
           </Button>
         </DialogFooter>

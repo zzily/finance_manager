@@ -37,6 +37,7 @@ export function BillsSection({
           {(["pending", "history"] as const).map((tab) => (
             <button
               key={tab}
+              data-testid={`bills-tab-${tab}`}
               className={`relative z-10 rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors duration-200 ${activeTab === tab ? "bg-slate-950 text-white shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
               onClick={() => onTabChange(tab)}
             >

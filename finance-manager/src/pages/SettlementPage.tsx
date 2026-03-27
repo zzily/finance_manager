@@ -20,7 +20,7 @@ export default function SettlementPage() {
   const pageState = useSettlementPageState(transactions.all, transactions.unsettled)
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50" data-testid="settlement-page">
       <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 shadow-[0_1px_0_0_rgb(0_0_0/.04)] backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
