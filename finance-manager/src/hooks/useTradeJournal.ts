@@ -1,102 +1,80 @@
-import { useEffect, useMemo, useState } from "react"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { toast } from "sonner"
 
-import type { TradeRecord, TradeRecordInput } from "../types"
+import { api, getApiErrorMessage, unwrapResponseData } from "../lib/api"
+import type { ApiResponse, IdPayload, TradeRecord, TradeRecordInput } from "../types"
 
-const STORAGE_KEY = "finance-cockpit-trade-records:v1"
-
-function sortTradeRecords(records: TradeRecord[]) {
-  return [...records].sort((left, right) => {
-    const dateCompare = right.traded_at.localeCompare(left.traded_at)
-
-    if (dateCompare !== 0) {
-      return dateCompare
-    }
-
-    return right.id.localeCompare(left.id)
-  })
+async function fetchTradeRecords() {
+  return unwrapResponseData(api.get<ApiResponse<TradeRecord[]>>("/trade_records/"))
 }
 
-function loadTradeRecords() {
-  if (typeof window === "undefined") {
-    return []
-  }
-
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-
-    if (!raw) {
-      return []
-    }
-
-    const parsed = JSON.parse(raw)
-
-    if (!Array.isArray(parsed)) {
-      return []
-    }
-
-    return sortTradeRecords(
-      parsed.filter((item): item is TradeRecord => {
-        return (
-          typeof item?.id === "string" &&
-          typeof item?.symbol === "string" &&
-          typeof item?.market === "string" &&
-          typeof item?.side === "string" &&
-          typeof item?.traded_at === "string" &&
-          typeof item?.pnl === "number"
-        )
-      }),
-    )
-  } catch {
-    return []
-  }
+async function createTradeRecordApi(payload: TradeRecordInput) {
+  return unwrapResponseData(api.post<ApiResponse<IdPayload>>("/trade_records/", payload))
 }
 
-function buildTradeRecord(input: TradeRecordInput, id: string): TradeRecord {
-  return {
-    ...input,
-    id,
-    symbol: input.symbol.trim(),
-    setup: input.setup?.trim(),
-    note: input.note?.trim() ? input.note.trim() : null,
-  }
+async function updateTradeRecordApi({
+  id,
+  payload,
+}: {
+  id: number
+  payload: TradeRecordInput
+}) {
+  return unwrapResponseData(api.put<ApiResponse<TradeRecord>>(`/trade_records/${id}`, payload))
 }
 
-function generateTradeId() {
-  return `trade-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+async function deleteTradeRecordApi(id: number) {
+  return unwrapResponseData(api.delete<ApiResponse<IdPayload>>(`/trade_records/${id}`))
 }
 
 export function useTradeJournal() {
-  const [records, setRecords] = useState<TradeRecord[]>(loadTradeRecords)
+  const queryClient = useQueryClient()
 
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return
-    }
+  const query = useQuery({
+    queryKey: ["trade_records"],
+    queryFn: fetchTradeRecords,
+  })
 
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(records))
-  }, [records])
+  const invalidateAll = () =>
+    queryClient.invalidateQueries({ queryKey: ["trade_records"] })
 
-  const actions = useMemo(
-    () => ({
-      create(input: TradeRecordInput) {
-        setRecords((previous) => sortTradeRecords([...previous, buildTradeRecord(input, generateTradeId())]))
-      },
-      update(id: string, input: TradeRecordInput) {
-        setRecords((previous) =>
-          sortTradeRecords(
-            previous.map((record) => (record.id === id ? buildTradeRecord(input, id) : record)),
-          ),
-        )
-      },
-      remove(id: string) {
-        setRecords((previous) => previous.filter((record) => record.id !== id))
-      },
-    }),
-    [],
-  )
+  const create = useMutation({
+    mutationFn: createTradeRecordApi,
+    onSuccess: async () => {
+      await invalidateAll()
+      toast.success("交易记录已保存", { description: "统计数据已经刷新" })
+    },
+    onError: (error) => {
+      toast.error("新增交易记录失败", { description: getApiErrorMessage(error, "请稍后重试") })
+    },
+  })
+
+  const update = useMutation({
+    mutationFn: updateTradeRecordApi,
+    onSuccess: async () => {
+      await invalidateAll()
+      toast.success("交易记录已更新", { description: "最新统计已经同步" })
+    },
+    onError: (error) => {
+      toast.error("更新交易记录失败", { description: getApiErrorMessage(error, "请稍后重试") })
+    },
+  })
+
+  const remove = useMutation({
+    mutationFn: deleteTradeRecordApi,
+    onSuccess: async () => {
+      await invalidateAll()
+      toast.success("交易记录已删除")
+    },
+    onError: (error) => {
+      toast.error("删除交易记录失败", { description: getApiErrorMessage(error, "请稍后重试") })
+    },
+  })
 
   return {
-    records,
-    ...actions,
+    query,
+    records: query.data ?? [],
+    create,
+    update,
+    remove,
   }
 }

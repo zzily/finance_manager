@@ -61,11 +61,13 @@ export function TradeRecordDialog({
   onOpenChange,
   onSubmit,
   record,
+  isPending,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (input: TradeRecordInput) => void
   record: TradeRecord | null
+  isPending: boolean
 }) {
   const [form, setForm] = useState<TradeRecordInput>(() => toFormValue(record))
   const [error, setError] = useState<string | null>(null)
@@ -225,10 +227,12 @@ export function TradeRecordDialog({
         {error && <ErrorBox msg={error} />}
 
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>
             取消
           </Button>
-          <Button onClick={handleSubmit}>{isEdit ? "保存修改" : "确认新增"}</Button>
+          <Button onClick={handleSubmit} disabled={isPending}>
+            {isPending ? "提交中..." : isEdit ? "保存修改" : "确认新增"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -5,7 +5,7 @@ import { filterTradeRecords, getTradeMetricGroups, getTradeOutcome } from "./tra
 
 const records: TradeRecord[] = [
   {
-    id: "trade-1",
+    id: 1,
     symbol: "BTCUSDT",
     market: "crypto",
     side: "long",
@@ -13,9 +13,10 @@ const records: TradeRecord[] = [
     pnl: 320,
     setup: "趋势突破",
     note: "顺势加仓",
+    created_at: "2026-03-31T00:00:00Z",
   },
   {
-    id: "trade-2",
+    id: 2,
     symbol: "ETHUSDT",
     market: "crypto",
     side: "short",
@@ -23,9 +24,10 @@ const records: TradeRecord[] = [
     pnl: -120,
     setup: "回撤做空",
     note: "止损执行",
+    created_at: "2026-03-26T00:00:00Z",
   },
   {
-    id: "trade-3",
+    id: 3,
     symbol: "IF 主连",
     market: "futures",
     side: "long",
@@ -33,9 +35,10 @@ const records: TradeRecord[] = [
     pnl: 180,
     setup: "早盘反转",
     note: "按计划减仓",
+    created_at: "2026-03-05T00:00:00Z",
   },
   {
-    id: "trade-4",
+    id: 4,
     symbol: "AAPL",
     market: "stock",
     side: "long",
@@ -43,6 +46,7 @@ const records: TradeRecord[] = [
     pnl: 40,
     setup: "财报波段",
     note: "低仓位试单",
+    created_at: "2026-01-20T00:00:00Z",
   },
 ]
 

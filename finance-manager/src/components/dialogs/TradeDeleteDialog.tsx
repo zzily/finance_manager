@@ -16,11 +16,13 @@ export function TradeDeleteDialog({
   onConfirm,
   onOpenChange,
   record,
+  isPending,
 }: {
   open: boolean
   onConfirm: () => void
   onOpenChange: (open: boolean) => void
   record: TradeRecord | null
+  isPending: boolean
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -41,11 +43,11 @@ export function TradeDeleteDialog({
         <ErrorBox msg="删除后，这笔交易不会再参与统计计算。" />
 
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>
             取消
           </Button>
-          <Button variant="destructive" onClick={onConfirm}>
-            确认删除
+          <Button variant="destructive" onClick={onConfirm} disabled={isPending}>
+            {isPending ? "删除中..." : "确认删除"}
           </Button>
         </DialogFooter>
       </DialogContent>

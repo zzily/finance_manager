@@ -167,13 +167,23 @@ export function TradingJournalPage() {
 
   function handleSubmit(input: TradeRecordInput) {
     if (editingRecord) {
-      journal.update(editingRecord.id, input)
+      journal.update.mutate(
+        { id: editingRecord.id, payload: input },
+        {
+          onSuccess: () => {
+            setDialogOpen(false)
+            setEditingRecord(null)
+          },
+        },
+      )
     } else {
-      journal.create(input)
+      journal.create.mutate(input, {
+        onSuccess: () => {
+          setDialogOpen(false)
+          setEditingRecord(null)
+        },
+      })
     }
-
-    setDialogOpen(false)
-    setEditingRecord(null)
   }
 
   function handleDeleteConfirm() {
@@ -181,8 +191,11 @@ export function TradingJournalPage() {
       return
     }
 
-    journal.remove(deletingRecord.id)
-    setDeletingRecord(null)
+    journal.remove.mutate(deletingRecord.id, {
+      onSuccess: () => {
+        setDeletingRecord(null)
+      },
+    })
   }
 
   return (
@@ -197,15 +210,15 @@ export function TradingJournalPage() {
               用统一口径记录每一笔交易，再看胜率和收益是不是在变好
             </h2>
             <p className="mt-3 text-sm leading-6 text-slate-500">
-              这页会自动统计总交易笔数、近 30 天和近 7 天的胜率与净收益。首版数据先保存在当前浏览器里，适合你先把记录习惯养起来。
+              这页会自动统计总交易笔数、近 30 天和近 7 天的胜率与净收益。现在记录会直接写入后端，适合你长期积累和持续复盘。
             </p>
           </div>
 
           <div className="flex flex-col items-start gap-3 sm:min-w-[280px] sm:items-end">
             <Badge variant="info" className="px-3 py-1 text-xs">
-              数据当前保存在本地浏览器
+              数据已接入后端 CRUD
             </Badge>
-            <Button onClick={handleCreate}>
+            <Button onClick={handleCreate} disabled={journal.create.isPending}>
               <Plus size={15} />
               新增交易记录
             </Button>
@@ -306,7 +319,13 @@ export function TradingJournalPage() {
           </div>
 
           <div className="mt-5 space-y-3">
-            {filteredRecords.length === 0 ? (
+            {journal.query.isLoading ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center text-sm text-slate-500">
+                正在加载交易记录...
+              </div>
+            ) : journal.query.isError ? (
+              <ErrorBox msg="交易记录加载失败，请检查后端服务后重试。" />
+            ) : filteredRecords.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
                 <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-slate-400 shadow-sm">
                   <BarChart3 size={24} />
@@ -317,7 +336,7 @@ export function TradingJournalPage() {
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   先录入一笔完整交易，这里就会开始累计你的笔数、胜率和收益表现。
                 </p>
-                <Button className="mt-5" onClick={handleCreate}>
+                <Button className="mt-5" onClick={handleCreate} disabled={journal.create.isPending}>
                   <Plus size={15} />
                   新增第一笔交易
                 </Button>
@@ -376,6 +395,7 @@ export function TradingJournalPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => handleDelete(record)}
+                        disabled={journal.remove.isPending}
                         className="text-red-600 hover:bg-red-50 hover:text-red-700"
                       >
                         <Trash2 size={14} />
@@ -394,13 +414,13 @@ export function TradingJournalPage() {
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
               Design note
             </p>
-            <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-              这版先只保留最关键的三组指标
-            </h3>
-            <p className="mt-3 text-sm leading-6 text-slate-500">
+          <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-950">
+            这版先只保留最关键的三组指标
+          </h3>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
               先养成稳定记录的习惯，比一开始就塞进太多高阶指标更重要。所以当前只保留笔数、胜率、净收益，以及最必要的 CRUD。
-            </p>
-          </div>
+          </p>
+        </div>
 
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
             <p className="text-sm font-semibold text-slate-900">下一步最值得加</p>
@@ -437,6 +457,7 @@ export function TradingJournalPage() {
         }}
         onSubmit={handleSubmit}
         record={editingRecord}
+        isPending={journal.create.isPending || journal.update.isPending}
       />
 
       <TradeDeleteDialog
@@ -448,6 +469,7 @@ export function TradingJournalPage() {
         }}
         onConfirm={handleDeleteConfirm}
         record={deletingRecord}
+        isPending={journal.remove.isPending}
       />
     </div>
   )

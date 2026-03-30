@@ -55,7 +55,7 @@ export type TradeMarket = "stock" | "crypto" | "futures" | "forex" | "options" |
 export type TradeOutcome = "win" | "loss" | "flat"
 
 export type TradeRecord = {
-  id: string
+  id: number
   symbol: string
   market: TradeMarket
   side: TradeSide
@@ -63,9 +63,10 @@ export type TradeRecord = {
   pnl: number
   setup?: string
   note?: string | null
+  created_at: string
 }
 
-export type TradeRecordInput = Omit<TradeRecord, "id">
+export type TradeRecordInput = Omit<TradeRecord, "id" | "created_at">
 
 export type SettleRequest = {
   transaction_id: number
