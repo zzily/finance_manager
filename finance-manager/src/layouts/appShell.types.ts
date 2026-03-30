@@ -1,1 +1,1 @@
-export type AppView = "dashboard" | "transactions" | "workbench" | "review"
+export type AppView = "dashboard" | "transactions" | "workbench" | "review" | "trading"

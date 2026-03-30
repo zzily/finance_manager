@@ -48,6 +48,25 @@ export type SalaryLogUpdate = {
   received_date?: string | null
 }
 
+export type TradeSide = "long" | "short"
+
+export type TradeMarket = "stock" | "crypto" | "futures" | "forex" | "options" | "other"
+
+export type TradeOutcome = "win" | "loss" | "flat"
+
+export type TradeRecord = {
+  id: string
+  symbol: string
+  market: TradeMarket
+  side: TradeSide
+  traded_at: string
+  pnl: number
+  setup?: string
+  note?: string | null
+}
+
+export type TradeRecordInput = Omit<TradeRecord, "id">
+
 export type SettleRequest = {
   transaction_id: number
   salary_log_id: number

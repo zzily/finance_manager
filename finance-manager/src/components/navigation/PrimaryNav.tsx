@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   ReceiptText,
   Sparkles,
+  TrendingUp,
 } from "lucide-react"
 
 import { cn } from "../../lib/utils"
@@ -37,6 +38,12 @@ const NAV_ITEMS: Array<{
     label: "复盘洞察",
     description: "看趋势与总结",
     icon: BarChart3,
+  },
+  {
+    view: "trading",
+    label: "交易日志",
+    description: "统计、编辑、复盘",
+    icon: TrendingUp,
   },
 ]
 

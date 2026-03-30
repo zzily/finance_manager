@@ -7,6 +7,7 @@ import type { AppView } from "./layouts/appShell.types"
 import { DashboardPage } from "./pages/DashboardPage"
 import { MonthlyReviewPage } from "./pages/MonthlyReviewPage"
 import { SettlementWorkbenchPage } from "./pages/SettlementWorkbenchPage"
+import { TradingJournalPage } from "./pages/TradingJournalPage"
 import { TransactionsPage } from "./pages/TransactionsPage"
 
 const DEFAULT_VIEW: AppView = "dashboard"
@@ -14,7 +15,13 @@ const DEFAULT_VIEW: AppView = "dashboard"
 function loadViewFromHash(): AppView {
   const hash = window.location.hash.replace(/^#/, "")
 
-  if (hash === "dashboard" || hash === "transactions" || hash === "workbench" || hash === "review") {
+  if (
+    hash === "dashboard" ||
+    hash === "transactions" ||
+    hash === "workbench" ||
+    hash === "review" ||
+    hash === "trading"
+  ) {
     return hash
   }
 
@@ -46,6 +53,8 @@ function App() {
         return <SettlementWorkbenchPage onNavigate={handleViewChange} />
       case "review":
         return <MonthlyReviewPage onNavigate={handleViewChange} />
+      case "trading":
+        return <TradingJournalPage />
       case "dashboard":
       default:
         return <DashboardPage onNavigate={handleViewChange} />

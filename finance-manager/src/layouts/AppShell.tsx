@@ -31,7 +31,7 @@ export function AppShell({
                   家庭财务驾驶舱
                 </h1>
                 <p className="mt-1 max-w-2xl text-sm text-slate-500">
-                  把日常记账、回款管理和核销动作拆成更清晰的工作流，减少来回切换和操作犹豫。
+                  把日常记账、回款管理、核销动作和交易复盘拆成更清晰的工作流，减少来回切换和操作犹豫。
                 </p>
               </div>
             </div>
@@ -42,6 +42,7 @@ export function AppShell({
                 {activeView === "transactions" && "账单管理与筛选"}
                 {activeView === "workbench" && "推荐核销与快速处理"}
                 {activeView === "review" && "趋势洞察与复盘"}
+                {activeView === "trading" && "交易日志与绩效统计"}
               </p>
             </div>
           </div>
