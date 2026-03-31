@@ -253,7 +253,7 @@ function parseOptionalNumber(value: string, label: string) {
   }
 
   const parsed = Number(value)
-  if (Number.isNaN(parsed)) {
+  if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
     return { value: null, error: `${label}需要是有效数字` }
   }
 
@@ -262,7 +262,7 @@ function parseOptionalNumber(value: string, label: string) {
 
 function parseRequiredNumber(value: string, label: string) {
   const parsed = Number(value)
-  if (!value.trim() || Number.isNaN(parsed)) {
+  if (!value.trim() || Number.isNaN(parsed) || !Number.isFinite(parsed)) {
     return { value: null, error: `${label}需要是有效数字` }
   }
 
@@ -447,6 +447,18 @@ export function TradeRecordDialog({
       return
     }
 
+    const parsedFees = parseOptionalNumber(form.fees, "手续费").value
+    if (typeof parsedFees === "number" && parsedFees < 0) {
+      setError("手续费不能为负数")
+      return
+    }
+
+    const parsedSlippage = parseOptionalNumber(form.slippage, "滑点").value
+    if (typeof parsedSlippage === "number" && parsedSlippage < 0) {
+      setError("滑点不能为负数")
+      return
+    }
+
     const entryAt = normalizeDateTime(form.entry_at)
     const exitAt = normalizeDateTime(form.exit_at)
     if (entryAt && exitAt && new Date(exitAt).getTime() <= new Date(entryAt).getTime()) {
@@ -473,8 +485,8 @@ export function TradeRecordDialog({
       planned_target: parseOptionalNumber(form.planned_target, "计划止盈").value,
       actual_stop: parseOptionalNumber(form.actual_stop, "实际止损").value,
       actual_target: parseOptionalNumber(form.actual_target, "实际止盈").value,
-      fees: parseOptionalNumber(form.fees, "手续费").value,
-      slippage: parseOptionalNumber(form.slippage, "滑点").value,
+      fees: parsedFees,
+      slippage: parsedSlippage,
       followed_plan:
         form.followed_plan === "unknown" ? null : form.followed_plan === "true",
       plan_clarity: form.plan_clarity === "unknown" ? null : form.plan_clarity,

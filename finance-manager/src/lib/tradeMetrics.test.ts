@@ -7,6 +7,7 @@ import {
   getTradeHoldingLabel,
   getTradeMetricGroups,
   getTradeNetPnl,
+  getOptionDaysToExpiration,
   getTradeOutcome,
   getTradeSessionLabel,
 } from "./tradeMetrics"
@@ -206,5 +207,11 @@ describe("tradeMetrics", () => {
     expect(getTradeSessionLabel(records[0])).toBe("开盘窗口")
     expect(getTradeSessionLabel(records[2])).toBe("持仓过夜")
     expect(getTradeOutcome(getTradeNetPnl(records[1]))).toBe("loss")
+  })
+
+  it("calculates option DTE by calendar day to avoid time-of-day rounding drift", () => {
+    expect(getOptionDaysToExpiration("2026-03-20", "2026-03-05T23:50:00")).toBe(15)
+    expect(getOptionDaysToExpiration("2026-03-20", "2026-03-06T00:10:00")).toBe(14)
+    expect(getOptionDaysToExpiration("invalid", "2026-03-06T00:10:00")).toBeNull()
   })
 })
