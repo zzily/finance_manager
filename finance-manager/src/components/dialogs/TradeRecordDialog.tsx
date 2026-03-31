@@ -28,7 +28,6 @@ import {
   TRADE_OPTION_STRUCTURE_OPTIONS,
   TRADE_PLAN_CLARITY_OPTIONS,
   TRADE_PREMIUM_TYPE_LABELS,
-  TRADE_PREMIUM_TYPE_OPTIONS,
   TRADE_SIDE_LABELS,
   TRADE_SIDE_OPTIONS,
 } from "../../lib/tradeOptions"
@@ -124,14 +123,12 @@ function formatCurrencyValue(value: number) {
 function getGrossPnlFormulaLabel({
   market,
   side,
-  optionPremiumType,
 }: {
   market: TradeRecordInput["market"]
   side: TradeRecordInput["side"]
-  optionPremiumType: NullablePremiumType
 }) {
   if (market === "options") {
-    if (optionPremiumType === "credit") {
+    if (side === "short") {
       return "(入场价 - 出场价) x 仓位"
     }
 
@@ -148,17 +145,27 @@ function getGrossPnlFormulaLabel({
 function getGrossPnlContextLabel({
   market,
   side,
-  optionPremiumType,
 }: {
   market: TradeRecordInput["market"]
   side: TradeRecordInput["side"]
-  optionPremiumType: NullablePremiumType
 }) {
-  if (market === "options" && optionPremiumType !== "unknown") {
-    return `按${TRADE_PREMIUM_TYPE_LABELS[optionPremiumType]}期权价格`
+  if (market === "options") {
+    return `按${side === "long" ? "付出权利金" : "收到权利金"}的期权价格`
   }
 
   return `按${TRADE_SIDE_LABELS[side]}方向`
+}
+
+function getDerivedOptionPremiumType(side: TradeRecordInput["side"]): TradePremiumType {
+  return side === "long" ? "debit" : "credit"
+}
+
+function getOptionEntryTypeLabel(side: TradeRecordInput["side"]) {
+  return side === "long" ? "买入开仓" : "卖出开仓"
+}
+
+function getOptionCashflowLabel(side: TradeRecordInput["side"]) {
+  return side === "long" ? "付出权利金" : "收到权利金"
 }
 
 function getEmptyForm(): TradeRecordFormValue {
@@ -273,14 +280,12 @@ function getComputedGrossPnl({
   exitPrice,
   positionSize,
   side,
-  optionPremiumType,
 }: {
   market: TradeRecordInput["market"]
   entryPrice: string
   exitPrice: string
   positionSize: string
   side: TradeRecordInput["side"]
-  optionPremiumType: NullablePremiumType
 }) {
   const parsedEntryPrice = Number(entryPrice)
   const parsedExitPrice = Number(exitPrice)
@@ -295,12 +300,8 @@ function getComputedGrossPnl({
     return null
   }
 
-  if (market === "options" && optionPremiumType === "unknown") {
-    return null
-  }
-
   if (market === "options") {
-    const premiumMultiplier = optionPremiumType === "credit" ? -1 : 1
+    const premiumMultiplier = side === "short" ? -1 : 1
     return (parsedExitPrice - parsedEntryPrice) * parsedPositionSize * premiumMultiplier
   }
 
@@ -363,6 +364,11 @@ export function TradeRecordDialog({
 }) {
   const [form, setForm] = useState<TradeRecordFormValue>(() => toFormValue(record))
   const [error, setError] = useState<string | null>(null)
+  const derivedOptionPremiumType: TradePremiumType | null =
+    form.market === "options" ? getDerivedOptionPremiumType(form.side) : null
+  const derivedOptionPremiumTypeLabel = derivedOptionPremiumType
+    ? TRADE_PREMIUM_TYPE_LABELS[derivedOptionPremiumType]
+    : null
 
   const computedGrossPnl = useMemo(
     () =>
@@ -372,20 +378,9 @@ export function TradeRecordDialog({
         exitPrice: form.exit_price,
         positionSize: form.position_size,
         side: form.side,
-        optionPremiumType: form.option_premium_type,
       }),
-    [
-      form.market,
-      form.entry_price,
-      form.exit_price,
-      form.position_size,
-      form.side,
-      form.option_premium_type,
-    ],
+    [form.market, form.entry_price, form.exit_price, form.position_size, form.side],
   )
-
-  const isOptionPremiumTypeMissing =
-    form.market === "options" && form.option_premium_type === "unknown"
 
   const netPreview = useMemo(() => {
     const gross =
@@ -500,9 +495,7 @@ export function TradeRecordDialog({
           ? form.option_structure
           : null,
       option_premium_type:
-        form.market === "options" && form.option_premium_type !== "unknown"
-          ? form.option_premium_type
-          : null,
+        derivedOptionPremiumType,
       option_max_risk:
         form.market === "options"
           ? parseOptionalNumber(form.option_max_risk, "最大风险").value
@@ -559,7 +552,7 @@ export function TradeRecordDialog({
                 />
               </Field>
 
-              <Field label="方向">
+              <Field label={form.market === "options" ? "开仓方式" : "方向"}>
                 <Select
                   value={form.side}
                   onValueChange={(value) =>
@@ -570,10 +563,16 @@ export function TradeRecordDialog({
                   }
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="请选择方向" />
+                    <SelectValue placeholder={form.market === "options" ? "请选择开仓方式" : "请选择方向"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {TRADE_SIDE_OPTIONS.map((option) => (
+                    {(form.market === "options"
+                      ? [
+                          { value: "long", label: "买入开仓" },
+                          { value: "short", label: "卖出开仓" },
+                        ]
+                      : TRADE_SIDE_OPTIONS
+                    ).map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -736,14 +735,12 @@ export function TradeRecordDialog({
                     {getGrossPnlContextLabel({
                       market: form.market,
                       side: form.side,
-                      optionPremiumType: form.option_premium_type,
                     })}
                     ，用
                     {" "}
                     {getGrossPnlFormulaLabel({
                       market: form.market,
                       side: form.side,
-                      optionPremiumType: form.option_premium_type,
                     })}
                     {" "}
                     自动估算
@@ -769,9 +766,7 @@ export function TradeRecordDialog({
                 <>
                   <Badge variant="secondary">自动毛盈亏</Badge>
                   <span className="text-slate-500">
-                    {isOptionPremiumTypeMissing
-                      ? "期权请先选择借记 / 贷记，再按期权价格自动计算毛盈亏。"
-                      : "补齐入场价、出场价和仓位后，可一键回填交易盈亏。"}
+                    补齐入场价、出场价和仓位后，可一键回填交易盈亏。
                   </span>
                 </>
               )}
@@ -1056,28 +1051,23 @@ export function TradeRecordDialog({
                   </Select>
                 </Field>
 
-                <Field label="借记 / 贷记">
-                  <Select
-                    value={form.option_premium_type}
-                    onValueChange={(value) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_premium_type: value as NullablePremiumType,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="请选择" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unknown">暂不标记</SelectItem>
-                      {TRADE_PREMIUM_TYPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <Field label="开仓现金流" hint="系统自动推导">
+                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant={derivedOptionPremiumType === "credit" ? "warning" : "info"}>
+                        {getOptionCashflowLabel(form.side)}
+                      </Badge>
+                      <span className="font-medium text-slate-900">
+                        {getOptionEntryTypeLabel(form.side)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">
+                      系统会同步标记为
+                      {" "}
+                      {derivedOptionPremiumTypeLabel}
+                      ，用于后续按期权策略拆解统计。
+                    </p>
+                  </div>
                 </Field>
 
                 <Field label="最大风险">
