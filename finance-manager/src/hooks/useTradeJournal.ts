@@ -2,27 +2,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { api, getApiErrorMessage, unwrapResponseData } from "../lib/api"
-import {
-  mergeTradeRecordWithMeta,
-  mergeTradeRecordsWithMeta,
-  removeTradeRecordMeta,
-  saveTradeRecordMeta,
-  splitTradeRecordInput,
-} from "../lib/tradeJournalStorage"
-import type {
-  ApiResponse,
-  IdPayload,
-  TradeRecordApi,
-  TradeRecordApiPayload,
-  TradeRecordInput,
-} from "../types"
+import type { ApiResponse, IdPayload, TradeRecord, TradeRecordInput } from "../types"
 
 async function fetchTradeRecords() {
-  const records = await unwrapResponseData(api.get<ApiResponse<TradeRecordApi[]>>("/trade_records/"))
-  return mergeTradeRecordsWithMeta(records)
+  return unwrapResponseData(api.get<ApiResponse<TradeRecord[]>>("/trade_records/"))
 }
 
-async function createTradeRecordApi(payload: TradeRecordApiPayload) {
+async function createTradeRecordApi(payload: TradeRecordInput) {
   return unwrapResponseData(api.post<ApiResponse<IdPayload>>("/trade_records/", payload))
 }
 
@@ -31,9 +17,9 @@ async function updateTradeRecordApi({
   payload,
 }: {
   id: number
-  payload: TradeRecordApiPayload
+  payload: TradeRecordInput
 }) {
-  return unwrapResponseData(api.put<ApiResponse<TradeRecordApi>>(`/trade_records/${id}`, payload))
+  return unwrapResponseData(api.put<ApiResponse<TradeRecord>>(`/trade_records/${id}`, payload))
 }
 
 async function deleteTradeRecordApi(id: number) {
@@ -48,16 +34,10 @@ export function useTradeJournal() {
     queryFn: fetchTradeRecords,
   })
 
-  const invalidateAll = () =>
-    queryClient.invalidateQueries({ queryKey: ["trade_records"] })
+  const invalidateAll = () => queryClient.invalidateQueries({ queryKey: ["trade_records"] })
 
   const create = useMutation({
-    mutationFn: async (input: TradeRecordInput) => {
-      const { apiPayload, meta } = splitTradeRecordInput(input)
-      const created = await createTradeRecordApi(apiPayload)
-      saveTradeRecordMeta(created.id, meta)
-      return created
-    },
+    mutationFn: createTradeRecordApi,
     onSuccess: async () => {
       await invalidateAll()
       toast.success("交易记录已保存", { description: "统计数据已经刷新" })
@@ -68,18 +48,7 @@ export function useTradeJournal() {
   })
 
   const update = useMutation({
-    mutationFn: async ({
-      id,
-      payload,
-    }: {
-      id: number
-      payload: TradeRecordInput
-    }) => {
-      const { apiPayload, meta } = splitTradeRecordInput(payload)
-      const updated = await updateTradeRecordApi({ id, payload: apiPayload })
-      saveTradeRecordMeta(id, meta)
-      return mergeTradeRecordWithMeta(updated, meta)
-    },
+    mutationFn: updateTradeRecordApi,
     onSuccess: async () => {
       await invalidateAll()
       toast.success("交易记录已更新", { description: "最新统计已经同步" })
@@ -90,11 +59,7 @@ export function useTradeJournal() {
   })
 
   const remove = useMutation({
-    mutationFn: async (id: number) => {
-      const deleted = await deleteTradeRecordApi(id)
-      removeTradeRecordMeta(id)
-      return deleted
-    },
+    mutationFn: deleteTradeRecordApi,
     onSuccess: async () => {
       await invalidateAll()
       toast.success("交易记录已删除")

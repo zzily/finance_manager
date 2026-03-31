@@ -78,7 +78,8 @@ export type TradeOptionStructure =
 
 export type TradePremiumType = "debit" | "credit"
 
-export type TradeRecordBase = {
+export type TradeRecord = {
+  id: number
   symbol: string
   market: TradeMarket
   side: TradeSide
@@ -86,9 +87,6 @@ export type TradeRecordBase = {
   pnl: number
   setup?: string
   note?: string | null
-}
-
-export type TradeRecordMeta = {
   entry_at?: string | null
   exit_at?: string | null
   entry_price?: number | null
@@ -114,18 +112,10 @@ export type TradeRecordMeta = {
   option_max_risk?: number | null
   option_max_reward?: number | null
   option_delta?: number | null
-}
-
-export type TradeRecordApi = TradeRecordBase & {
-  id: number
   created_at: string
 }
 
-export type TradeRecord = TradeRecordApi & TradeRecordMeta
-
 export type TradeRecordInput = Omit<TradeRecord, "id" | "created_at">
-
-export type TradeRecordApiPayload = Omit<TradeRecordBase, "created_at">
 
 export type SettleRequest = {
   transaction_id: number

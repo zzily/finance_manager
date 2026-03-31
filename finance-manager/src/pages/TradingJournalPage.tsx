@@ -452,8 +452,8 @@ export function TradingJournalPage() {
             </div>
 
             <div className="flex flex-col items-start gap-3 lg:items-end">
-              <Badge variant="warning" className="px-3 py-1 text-xs">
-                扩展字段当前保存在本机浏览器
+              <Badge variant="info" className="px-3 py-1 text-xs">
+                结构化字段已接入后端 CRUD
               </Badge>
               <Button onClick={handleCreate} disabled={journal.create.isPending}>
                 <Plus size={15} />
