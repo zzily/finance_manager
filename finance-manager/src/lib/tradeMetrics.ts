@@ -102,6 +102,13 @@ function parseDateTime(value?: string | null) {
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
+function toDateKey(value: Date) {
+  const year = value.getFullYear()
+  const month = String(value.getMonth() + 1).padStart(2, "0")
+  const day = String(value.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
 function startOfNextDay(now: Date) {
   return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0).getTime()
 }
@@ -441,14 +448,17 @@ export function getOptionDaysToExpiration(
   tradeTime: string | null | undefined,
 ) {
   const expiration = parseTradeDate(expirationDate ?? "")
-  const tradeDate = parseDateTime(tradeTime) ?? parseTradeDate((tradeTime ?? "").slice(0, 10))
+  const parsedTradeDateTime = parseDateTime(tradeTime)
+  const tradeDate = parsedTradeDateTime
+    ? parseTradeDate(toDateKey(parsedTradeDateTime))
+    : parseTradeDate((tradeTime ?? "").slice(0, 10))
 
   if (!expiration || !tradeDate) {
     return null
   }
 
   const diff = expiration.getTime() - tradeDate.getTime()
-  return Math.round(diff / (1000 * 60 * 60 * 24))
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
 }
 
 export function filterTradeRecords(
