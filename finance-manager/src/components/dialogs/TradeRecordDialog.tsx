@@ -27,6 +27,7 @@ import {
   TRADE_OPTION_RIGHT_OPTIONS,
   TRADE_OPTION_STRUCTURE_OPTIONS,
   TRADE_PLAN_CLARITY_OPTIONS,
+  TRADE_PREMIUM_TYPE_LABELS,
   TRADE_PREMIUM_TYPE_OPTIONS,
   TRADE_SIDE_LABELS,
   TRADE_SIDE_OPTIONS,
@@ -118,6 +119,46 @@ function formatCurrencyValue(value: number) {
   }
 
   return currency.format(0)
+}
+
+function getGrossPnlFormulaLabel({
+  market,
+  side,
+  optionPremiumType,
+}: {
+  market: TradeRecordInput["market"]
+  side: TradeRecordInput["side"]
+  optionPremiumType: NullablePremiumType
+}) {
+  if (market === "options") {
+    if (optionPremiumType === "credit") {
+      return "(入场价 - 出场价) x 仓位"
+    }
+
+    return "(出场价 - 入场价) x 仓位"
+  }
+
+  if (side === "short") {
+    return "(入场价 - 出场价) x 仓位"
+  }
+
+  return "(出场价 - 入场价) x 仓位"
+}
+
+function getGrossPnlContextLabel({
+  market,
+  side,
+  optionPremiumType,
+}: {
+  market: TradeRecordInput["market"]
+  side: TradeRecordInput["side"]
+  optionPremiumType: NullablePremiumType
+}) {
+  if (market === "options" && optionPremiumType !== "unknown") {
+    return `按${TRADE_PREMIUM_TYPE_LABELS[optionPremiumType]}期权价格`
+  }
+
+  return `按${TRADE_SIDE_LABELS[side]}方向`
 }
 
 function getEmptyForm(): TradeRecordFormValue {
@@ -227,15 +268,19 @@ function normalizeDateTime(value: string) {
 }
 
 function getComputedGrossPnl({
+  market,
   entryPrice,
   exitPrice,
   positionSize,
   side,
+  optionPremiumType,
 }: {
+  market: TradeRecordInput["market"]
   entryPrice: string
   exitPrice: string
   positionSize: string
   side: TradeRecordInput["side"]
+  optionPremiumType: NullablePremiumType
 }) {
   const parsedEntryPrice = Number(entryPrice)
   const parsedExitPrice = Number(exitPrice)
@@ -248,6 +293,15 @@ function getComputedGrossPnl({
     [parsedEntryPrice, parsedExitPrice, parsedPositionSize].some((value) => Number.isNaN(value))
   ) {
     return null
+  }
+
+  if (market === "options" && optionPremiumType === "unknown") {
+    return null
+  }
+
+  if (market === "options") {
+    const premiumMultiplier = optionPremiumType === "credit" ? -1 : 1
+    return (parsedExitPrice - parsedEntryPrice) * parsedPositionSize * premiumMultiplier
   }
 
   const directionMultiplier = side === "long" ? 1 : -1
@@ -313,13 +367,25 @@ export function TradeRecordDialog({
   const computedGrossPnl = useMemo(
     () =>
       getComputedGrossPnl({
+        market: form.market,
         entryPrice: form.entry_price,
         exitPrice: form.exit_price,
         positionSize: form.position_size,
         side: form.side,
+        optionPremiumType: form.option_premium_type,
       }),
-    [form.entry_price, form.exit_price, form.position_size, form.side],
+    [
+      form.market,
+      form.entry_price,
+      form.exit_price,
+      form.position_size,
+      form.side,
+      form.option_premium_type,
+    ],
   )
+
+  const isOptionPremiumTypeMissing =
+    form.market === "options" && form.option_premium_type === "unknown"
 
   const netPreview = useMemo(() => {
     const gross =
@@ -667,7 +733,20 @@ export function TradeRecordDialog({
                 <>
                   <Badge variant="success">自动毛盈亏</Badge>
                   <span className="text-slate-500">
-                    按 {TRADE_SIDE_LABELS[form.side]} 方向，用 (出场价 - 入场价) x 仓位 自动估算
+                    {getGrossPnlContextLabel({
+                      market: form.market,
+                      side: form.side,
+                      optionPremiumType: form.option_premium_type,
+                    })}
+                    ，用
+                    {" "}
+                    {getGrossPnlFormulaLabel({
+                      market: form.market,
+                      side: form.side,
+                      optionPremiumType: form.option_premium_type,
+                    })}
+                    {" "}
+                    自动估算
                   </span>
                   <span className={cn("font-semibold", computedGrossPnl >= 0 ? "text-emerald-700" : "text-red-700")}>
                     {formatCurrencyValue(computedGrossPnl)}
@@ -690,7 +769,9 @@ export function TradeRecordDialog({
                 <>
                   <Badge variant="secondary">自动毛盈亏</Badge>
                   <span className="text-slate-500">
-                    补齐入场价、出场价和仓位后，可一键回填交易盈亏。
+                    {isOptionPremiumTypeMissing
+                      ? "期权请先选择借记 / 贷记，再按期权价格自动计算毛盈亏。"
+                      : "补齐入场价、出场价和仓位后，可一键回填交易盈亏。"}
                   </span>
                 </>
               )}
