@@ -9,11 +9,11 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-slate-900 text-slate-50 hover:bg-slate-900/80",
+          "bg-slate-900 text-slate-50",
         secondary:
-          "bg-slate-100 text-slate-900 hover:bg-slate-200",
+          "bg-slate-100 text-slate-900",
         destructive:
-          "bg-red-500 text-slate-50 hover:bg-red-500/80",
+          "bg-red-500 text-slate-50",
         outline: "text-slate-950",
         success:
           "border-emerald-200 bg-emerald-50 text-emerald-700",
