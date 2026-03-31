@@ -28,9 +28,11 @@ import {
   TRADE_OPTION_STRUCTURE_OPTIONS,
   TRADE_PLAN_CLARITY_OPTIONS,
   TRADE_PREMIUM_TYPE_OPTIONS,
+  TRADE_SIDE_LABELS,
   TRADE_SIDE_OPTIONS,
 } from "../../lib/tradeOptions"
 import { currency } from "../../lib/formatters"
+import { cn } from "../../lib/utils"
 import type {
   TradeExecutionQuality,
   TradeMistakeType,
@@ -104,6 +106,18 @@ function toDateTimeLocalValue(value?: string | null) {
 
 function toTextNumber(value?: number | null) {
   return typeof value === "number" && Number.isFinite(value) ? `${value}` : ""
+}
+
+function formatCurrencyValue(value: number) {
+  if (value > 0) {
+    return `+${currency.format(value)}`
+  }
+
+  if (value < 0) {
+    return `-${currency.format(Math.abs(value))}`
+  }
+
+  return currency.format(0)
 }
 
 function getEmptyForm(): TradeRecordFormValue {
@@ -212,6 +226,34 @@ function normalizeDateTime(value: string) {
   return trimmed ? trimmed : null
 }
 
+function getComputedGrossPnl({
+  entryPrice,
+  exitPrice,
+  positionSize,
+  side,
+}: {
+  entryPrice: string
+  exitPrice: string
+  positionSize: string
+  side: TradeRecordInput["side"]
+}) {
+  const parsedEntryPrice = Number(entryPrice)
+  const parsedExitPrice = Number(exitPrice)
+  const parsedPositionSize = Number(positionSize)
+
+  if (
+    !entryPrice.trim() ||
+    !exitPrice.trim() ||
+    !positionSize.trim() ||
+    [parsedEntryPrice, parsedExitPrice, parsedPositionSize].some((value) => Number.isNaN(value))
+  ) {
+    return null
+  }
+
+  const directionMultiplier = side === "long" ? 1 : -1
+  return (parsedExitPrice - parsedEntryPrice) * parsedPositionSize * directionMultiplier
+}
+
 function Field({
   children,
   label,
@@ -268,8 +310,24 @@ export function TradeRecordDialog({
   const [form, setForm] = useState<TradeRecordFormValue>(() => toFormValue(record))
   const [error, setError] = useState<string | null>(null)
 
+  const computedGrossPnl = useMemo(
+    () =>
+      getComputedGrossPnl({
+        entryPrice: form.entry_price,
+        exitPrice: form.exit_price,
+        positionSize: form.position_size,
+        side: form.side,
+      }),
+    [form.entry_price, form.exit_price, form.position_size, form.side],
+  )
+
   const netPreview = useMemo(() => {
-    const gross = Number(form.pnl || "0")
+    const gross =
+      form.pnl.trim().length > 0
+        ? Number(form.pnl)
+        : computedGrossPnl === null
+          ? 0
+          : computedGrossPnl
     const fees = Number(form.fees || "0")
     const slippage = Number(form.slippage || "0")
 
@@ -278,7 +336,7 @@ export function TradeRecordDialog({
     }
 
     return gross - fees - slippage
-  }, [form.fees, form.pnl, form.slippage])
+  }, [computedGrossPnl, form.fees, form.pnl, form.slippage])
 
   function toggleMistakeTag(value: TradeMistakeType) {
     setForm((previous) => ({
@@ -605,8 +663,45 @@ export function TradeRecordDialog({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
+              {computedGrossPnl !== null ? (
+                <>
+                  <Badge variant="success">自动毛盈亏</Badge>
+                  <span className="text-slate-500">
+                    按 {TRADE_SIDE_LABELS[form.side]} 方向，用 (出场价 - 入场价) x 仓位 自动估算
+                  </span>
+                  <span className={cn("font-semibold", computedGrossPnl >= 0 ? "text-emerald-700" : "text-red-700")}>
+                    {formatCurrencyValue(computedGrossPnl)}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setForm((previous) => ({
+                        ...previous,
+                        pnl: `${Number(computedGrossPnl.toFixed(2))}`,
+                      }))
+                    }
+                  >
+                    回填到交易盈亏
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Badge variant="secondary">自动毛盈亏</Badge>
+                  <span className="text-slate-500">
+                    补齐入场价、出场价和仓位后，可一键回填交易盈亏。
+                  </span>
+                </>
+              )}
+            </div>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
               <Badge variant="info">自动净结果</Badge>
-              <span className="text-slate-500">交易盈亏 - 手续费 - 滑点</span>
+              <span className="text-slate-500">
+                {(form.pnl.trim().length > 0 ? "交易盈亏" : computedGrossPnl !== null ? "自动毛盈亏" : "交易盈亏") +
+                  " - 手续费 - 滑点"}
+              </span>
               <span className="font-semibold text-slate-900">
                 {netPreview === null ? "请输入有效数字" : currency.format(netPreview)}
               </span>
