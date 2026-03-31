@@ -2,13 +2,27 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
 import { api, getApiErrorMessage, unwrapResponseData } from "../lib/api"
-import type { ApiResponse, IdPayload, TradeRecord, TradeRecordInput } from "../types"
+import {
+  mergeTradeRecordWithMeta,
+  mergeTradeRecordsWithMeta,
+  removeTradeRecordMeta,
+  saveTradeRecordMeta,
+  splitTradeRecordInput,
+} from "../lib/tradeJournalStorage"
+import type {
+  ApiResponse,
+  IdPayload,
+  TradeRecordApi,
+  TradeRecordApiPayload,
+  TradeRecordInput,
+} from "../types"
 
 async function fetchTradeRecords() {
-  return unwrapResponseData(api.get<ApiResponse<TradeRecord[]>>("/trade_records/"))
+  const records = await unwrapResponseData(api.get<ApiResponse<TradeRecordApi[]>>("/trade_records/"))
+  return mergeTradeRecordsWithMeta(records)
 }
 
-async function createTradeRecordApi(payload: TradeRecordInput) {
+async function createTradeRecordApi(payload: TradeRecordApiPayload) {
   return unwrapResponseData(api.post<ApiResponse<IdPayload>>("/trade_records/", payload))
 }
 
@@ -17,9 +31,9 @@ async function updateTradeRecordApi({
   payload,
 }: {
   id: number
-  payload: TradeRecordInput
+  payload: TradeRecordApiPayload
 }) {
-  return unwrapResponseData(api.put<ApiResponse<TradeRecord>>(`/trade_records/${id}`, payload))
+  return unwrapResponseData(api.put<ApiResponse<TradeRecordApi>>(`/trade_records/${id}`, payload))
 }
 
 async function deleteTradeRecordApi(id: number) {
@@ -38,7 +52,12 @@ export function useTradeJournal() {
     queryClient.invalidateQueries({ queryKey: ["trade_records"] })
 
   const create = useMutation({
-    mutationFn: createTradeRecordApi,
+    mutationFn: async (input: TradeRecordInput) => {
+      const { apiPayload, meta } = splitTradeRecordInput(input)
+      const created = await createTradeRecordApi(apiPayload)
+      saveTradeRecordMeta(created.id, meta)
+      return created
+    },
     onSuccess: async () => {
       await invalidateAll()
       toast.success("交易记录已保存", { description: "统计数据已经刷新" })
@@ -49,7 +68,18 @@ export function useTradeJournal() {
   })
 
   const update = useMutation({
-    mutationFn: updateTradeRecordApi,
+    mutationFn: async ({
+      id,
+      payload,
+    }: {
+      id: number
+      payload: TradeRecordInput
+    }) => {
+      const { apiPayload, meta } = splitTradeRecordInput(payload)
+      const updated = await updateTradeRecordApi({ id, payload: apiPayload })
+      saveTradeRecordMeta(id, meta)
+      return mergeTradeRecordWithMeta(updated, meta)
+    },
     onSuccess: async () => {
       await invalidateAll()
       toast.success("交易记录已更新", { description: "最新统计已经同步" })
@@ -60,7 +90,11 @@ export function useTradeJournal() {
   })
 
   const remove = useMutation({
-    mutationFn: deleteTradeRecordApi,
+    mutationFn: async (id: number) => {
+      const deleted = await deleteTradeRecordApi(id)
+      removeTradeRecordMeta(id)
+      return deleted
+    },
     onSuccess: async () => {
       await invalidateAll()
       toast.success("交易记录已删除")

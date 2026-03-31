@@ -54,8 +54,31 @@ export type TradeMarket = "stock" | "crypto" | "futures" | "forex" | "options" |
 
 export type TradeOutcome = "win" | "loss" | "flat"
 
-export type TradeRecord = {
-  id: number
+export type TradePlanClarity = "clear" | "mixed" | "missing"
+
+export type TradeExecutionQuality = "disciplined" | "drifted" | "broken"
+
+export type TradeMistakeType =
+  | "chasing"
+  | "early_exit"
+  | "holding_loser"
+  | "oversized"
+  | "no_edge"
+  | "unplanned"
+
+export type TradeOptionRight = "call" | "put"
+
+export type TradeOptionStructure =
+  | "single"
+  | "vertical_spread"
+  | "iron_condor"
+  | "straddle"
+  | "strangle"
+  | "other"
+
+export type TradePremiumType = "debit" | "credit"
+
+export type TradeRecordBase = {
   symbol: string
   market: TradeMarket
   side: TradeSide
@@ -63,10 +86,46 @@ export type TradeRecord = {
   pnl: number
   setup?: string
   note?: string | null
+}
+
+export type TradeRecordMeta = {
+  entry_at?: string | null
+  exit_at?: string | null
+  entry_price?: number | null
+  exit_price?: number | null
+  position_size?: number | null
+  thesis?: string | null
+  planned_stop?: number | null
+  planned_target?: number | null
+  actual_stop?: number | null
+  actual_target?: number | null
+  fees?: number | null
+  slippage?: number | null
+  followed_plan?: boolean | null
+  plan_clarity?: TradePlanClarity | null
+  execution_quality?: TradeExecutionQuality | null
+  mistake_tags: TradeMistakeType[]
+  lesson?: string | null
+  option_expiration?: string | null
+  option_strike?: number | null
+  option_right?: TradeOptionRight | null
+  option_structure?: TradeOptionStructure | null
+  option_premium_type?: TradePremiumType | null
+  option_max_risk?: number | null
+  option_max_reward?: number | null
+  option_delta?: number | null
+}
+
+export type TradeRecordApi = TradeRecordBase & {
+  id: number
   created_at: string
 }
 
+export type TradeRecord = TradeRecordApi & TradeRecordMeta
+
 export type TradeRecordInput = Omit<TradeRecord, "id" | "created_at">
+
+export type TradeRecordApiPayload = Omit<TradeRecordBase, "created_at">
 
 export type SettleRequest = {
   transaction_id: number
