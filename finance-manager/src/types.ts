@@ -8,6 +8,10 @@ export type Transaction = {
   category: "work" | "personal"
   status: TransactionStatus
   created_at: string
+  occurred_at?: string | null
+  occurred_at_inferred?: boolean
+  expense_category_id?: number | null
+  expense_category_name?: string | null
 }
 
 export type SalaryLog = {
@@ -20,13 +24,20 @@ export type SalaryLog = {
   received_date: string
 }
 
+export type ExpenseCategory = { id: number; name: string; kind: "work" | "personal"; archived: boolean }
+
 export type TransactionCreate = {
+  expense_category_id?: number | null
+  payment_salary_log_id?: number
+  occurred_at?: string
   title: string
   amount_out: number
   category: "work" | "personal"
 }
 
 export type TransactionUpdate = {
+  expense_category_id?: number | null
+  occurred_at?: string
   title: string
   amount_out: number
   category: "work" | "personal"
@@ -159,6 +170,7 @@ export type CategoryBreakdown = {
 export type ChartData = {
   monthly_timeline: MonthlyData[]
   category_breakdown: CategoryBreakdown[]
+  personal_category_breakdown?: CategoryBreakdown[]
 }
 
 export type SummaryData = {
@@ -169,6 +181,7 @@ export type SummaryData = {
       total_lent: number
       total_reimbursed: number
       current_debt: number
+      period_outstanding?: number
       status: string
     }
     family_loop: {

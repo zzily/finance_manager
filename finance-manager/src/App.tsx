@@ -1,75 +1,78 @@
-import { useEffect, useState } from "react"
-
+import { lazy, Suspense, useEffect, useState } from "react"
 import { Toaster } from "sonner"
-import { ApiSwitcher } from "./components/common/ApiSwitcher"
+import { useApiEndpoint } from "./hooks/useApiEndpoint"
 import { AppShell } from "./layouts/AppShell"
-import type { AppView } from "./layouts/appShell.types"
+import { buildHash, readLocation, type AppNavigate } from "./lib/navigation"
 import { DashboardPage } from "./pages/DashboardPage"
-import { MonthlyReviewPage } from "./pages/MonthlyReviewPage"
+
 import { SettlementWorkbenchPage } from "./pages/SettlementWorkbenchPage"
-import { TradingJournalPage } from "./pages/TradingJournalPage"
+
 import { TransactionsPage } from "./pages/TransactionsPage"
 
-const DEFAULT_VIEW: AppView = "dashboard"
-
-function loadViewFromHash(): AppView {
-  const hash = window.location.hash.replace(/^#/, "")
-
-  if (
-    hash === "dashboard" ||
-    hash === "transactions" ||
-    hash === "workbench" ||
-    hash === "review" ||
-    hash === "trading"
-  ) {
-    return hash
-  }
-
-  return DEFAULT_VIEW
-}
+const MonthlyReviewPage = lazy(() =>
+  import("./pages/MonthlyReviewPage").then((module) => ({ default: module.MonthlyReviewPage })),
+)
+const TradingJournalPage = lazy(() =>
+  import("./pages/TradingJournalPage").then((module) => ({ default: module.TradingJournalPage })),
+)
 
 function App() {
-  const [activeView, setActiveView] = useState<AppView>(loadViewFromHash)
-
+  const endpoint = useApiEndpoint()
+  const [location, setLocation] = useState(() => readLocation())
   useEffect(() => {
-    function handleHashChange() {
-      setActiveView(loadViewFromHash())
-    }
-
+    const handleHashChange = () => setLocation(readLocation())
     window.addEventListener("hashchange", handleHashChange)
     return () => window.removeEventListener("hashchange", handleHashChange)
   }, [])
-
-  function handleViewChange(nextView: AppView) {
-    window.location.hash = nextView
-    setActiveView(nextView)
-  }
-
-  function renderCurrentView() {
-    switch (activeView) {
-      case "transactions":
-        return <TransactionsPage onNavigate={handleViewChange} />
-      case "workbench":
-        return <SettlementWorkbenchPage onNavigate={handleViewChange} />
-      case "review":
-        return <MonthlyReviewPage onNavigate={handleViewChange} />
-      case "trading":
-        return <TradingJournalPage />
-      case "dashboard":
-      default:
-        return <DashboardPage onNavigate={handleViewChange} />
+  const navigate: AppNavigate = (view, params) => {
+    try {
+      sessionStorage.setItem(`finance-view-${location.view}`, window.location.hash)
+      sessionStorage.setItem(`finance-scroll-${location.view}`, String(window.scrollY))
+    } catch {
+      /* Navigation also works without session storage. */
     }
+    let hash = buildHash(view, params)
+    let scroll = 0
+    if (!params) {
+      try {
+        hash = sessionStorage.getItem(`finance-view-${view}`) || hash
+        scroll = Number(sessionStorage.getItem(`finance-scroll-${view}`)) || 0
+      } catch {
+        /* Use the default view. */
+      }
+    }
+    window.location.hash = hash
+    setLocation(readLocation(hash))
+    requestAnimationFrame(() => window.scrollTo({ top: scroll, behavior: "instant" }))
   }
-
+  const transactionId = Number(location.params.get("transactionId")) || undefined
   return (
     <>
-      <AppShell activeView={activeView} onViewChange={handleViewChange}>
-        {renderCurrentView()}
+      <AppShell key={endpoint} activeView={location.view} onViewChange={navigate}>
+        <Suspense
+          fallback={
+            <p role="status" className="py-8 text-sm text-muted-foreground">
+              正在打开页面…
+            </p>
+          }
+        >
+          {location.view === "dashboard" && <DashboardPage onNavigate={navigate} />}
+          {location.view === "transactions" && (
+            <TransactionsPage key={location.params.toString()} onNavigate={navigate} />
+          )}
+          {location.view === "workbench" && (
+            <SettlementWorkbenchPage
+              key={transactionId ?? "queue"}
+              initialTransactionId={transactionId}
+              onNavigate={navigate}
+            />
+          )}
+          {location.view === "review" && <MonthlyReviewPage onNavigate={navigate} />}
+          {location.view === "trading" && <TradingJournalPage />}
+        </Suspense>
       </AppShell>
       <Toaster position="top-center" richColors closeButton />
-      <ApiSwitcher />
     </>
   )
 }
-
 export default App

@@ -1,6 +1,7 @@
-import { useState } from "react"
+import { useId, useState } from "react"
 
 import { Loader2 } from "lucide-react"
+import { dateInputValue, todayKey, moneyError } from "../../lib/formHelpers"
 import { ErrorBox } from "../common"
 import { Button } from "../ui/button"
 import {
@@ -48,6 +49,7 @@ function EditSalaryLogDialogBody({
   onSubmit: (id: number, payload: SalaryLogUpdate) => void
   salaryLog: SalaryLog | null
 }) {
+  const id = useId()
   const [form, setForm] = useState<SalaryLogUpdate>(() => createSalaryLogForm(salaryLog))
   const [error, setError] = useState<string | null>(null)
 
@@ -56,12 +58,23 @@ function EditSalaryLogDialogBody({
   function handleSubmit() {
     if (!salaryLog) return
     const amount = Number(form.amount)
-    if (Number.isNaN(amount) || amount <= 0) { setError("请输入有效金额"); return }
+    const amountError = moneyError(amount)
+    if (amountError) {
+      setError(amountError)
+      return
+    }
     if (amount < amountUsed) {
       setError(`金额不能低于已核销的 ${currency.format(amountUsed)}`)
       return
     }
-    if (!form.month.trim()) { setError("请选择归属月份"); return }
+    if (!form.received_date || dateInputValue(form.received_date) > todayKey()) {
+      setError("请选择不晚于今天的到账日期")
+      return
+    }
+    if (!form.month.trim()) {
+      setError("请选择归属月份")
+      return
+    }
     setError(null)
     onSubmit(salaryLog.id, { ...form, amount })
   }
@@ -69,17 +82,21 @@ function EditSalaryLogDialogBody({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>编辑回款记录</DialogTitle>
+        <DialogTitle>编辑收入记录</DialogTitle>
         <DialogDescription>
           {salaryLog && amountUsed > 0
             ? `该笔资金已核销 ${currency.format(amountUsed)}，金额不可低于此值`
-            : "修改回款金额、来源或归属月份"}
+            : "修改金额、来源、到账日期或归属月份"}
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-4">
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-500">金额</label>
+          <label htmlFor={`${id}-amount`} className="text-sm font-medium">
+            金额
+          </label>
           <Input
+            id={`${id}-amount`}
+            inputMode="decimal"
             type="number"
             min={amountUsed}
             step="0.01"
@@ -95,14 +112,21 @@ function EditSalaryLogDialogBody({
           )}
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-500">来源</label>
+          <label htmlFor={`${id}-source`} className="text-sm font-medium">
+            来源
+          </label>
           <Select
             value={form.source}
             onValueChange={(value) => {
-              setForm((prev) => ({ ...prev, source: value as SalaryLogUpdate["source"] }))
+              setForm((prev) => ({
+                ...prev,
+                source: value as SalaryLogUpdate["source"],
+              }))
             }}
           >
-            <SelectTrigger><SelectValue placeholder="请选择来源" /></SelectTrigger>
+            <SelectTrigger id={`${id}-source`}>
+              <SelectValue placeholder="请选择来源" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="salary">工资</SelectItem>
               <SelectItem value="reimbursement">报销</SelectItem>
@@ -111,16 +135,41 @@ function EditSalaryLogDialogBody({
           </Select>
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-500">归属月份</label>
+          <label htmlFor={`${id}-date`} className="text-sm font-medium">
+            到账日期
+          </label>
+          <Input
+            id={`${id}-date`}
+            type="date"
+            max={todayKey()}
+            value={dateInputValue(form.received_date)}
+            onChange={(e) =>
+              setForm((prev) => ({
+                ...prev,
+                received_date: e.target.value
+                  ? new Date(`${e.target.value}T12:00:00`).toISOString()
+                  : null,
+              }))
+            }
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label htmlFor={`${id}-month`} className="text-sm font-medium">
+            归属月份
+          </label>
           <MonthPicker
+            id={`${id}-month`}
             value={form.month}
             onChange={(value) => setForm((prev) => ({ ...prev, month: value }))}
             placeholder="选择归属月份"
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-xs font-medium text-slate-500">备注</label>
+          <label htmlFor={`${id}-remark`} className="text-sm font-medium">
+            备注
+          </label>
           <Input
+            id={`${id}-remark`}
             value={form.remark ?? ""}
             onChange={(e) => setForm((prev) => ({ ...prev, remark: e.target.value }))}
             placeholder="可选备注"
@@ -129,7 +178,9 @@ function EditSalaryLogDialogBody({
         {error && <ErrorBox msg={error} />}
       </div>
       <DialogFooter>
-        <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>取消</Button>
+        <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>
+          取消
+        </Button>
         <Button onClick={handleSubmit} disabled={isPending}>
           {isPending && <Loader2 size={14} className="animate-spin" />}
           {isPending ? "保存中..." : "保存修改"}

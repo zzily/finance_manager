@@ -1,38 +1,28 @@
-import { Search, X } from "lucide-react"
-
+import { useState } from "react"
+import { SlidersHorizontal } from "lucide-react"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { cn } from "../../lib/utils"
-import type {
-  TransactionFilterState,
-  TransactionSort,
-} from "../../hooks/useTransactionFilters"
-
-const nativeSelectClassName =
-  "h-10 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-700 shadow-sm outline-none transition focus:border-slate-400 focus:ring-2 focus:ring-slate-200"
-
-const statusOptions: Array<{ label: string; value: TransactionFilterState["status"] }> = [
-  { value: "all", label: "全部状态" },
-  { value: "pending", label: "待核销" },
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group"
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/collapsible"
+import { Field, FieldLabel, FieldGroup } from "../ui/field"
+import type { TransactionFilterState, TransactionSort } from "../../hooks/useTransactionFilters"
+const statusOptions = [
+  { value: "all", label: "全部" },
+  { value: "open", label: "待处理" },
+  { value: "pending", label: "未核销" },
   { value: "partially_settled", label: "部分核销" },
   { value: "settled", label: "已结清" },
-]
-
-const categoryOptions: Array<{ label: string; value: TransactionFilterState["category"] }> = [
-  { value: "all", label: "全部分类" },
-  { value: "work", label: "工作垫付" },
-  { value: "personal", label: "个人支出" },
-]
-
-const sortLabels: Record<TransactionSort, string> = {
+] as const
+const sorts: Record<TransactionSort, string> = {
   latest: "最新优先",
   oldest: "最早优先",
   amount_desc: "金额从高到低",
   amount_asc: "金额从低到高",
-  debt_desc: "欠款从高到低",
+  debt_desc: "未结金额从高到低",
 }
-
 export function TransactionFiltersBar({
+  availableExpenseCategories = [],
+  onExpenseCategoryChange,
   availableMonths,
   hasActiveFilters,
   onCategoryChange,
@@ -43,102 +33,137 @@ export function TransactionFiltersBar({
   onStatusChange,
   state,
 }: {
+  availableExpenseCategories?: Array<[string, string]>
+  onExpenseCategoryChange?: (v: string) => void
   availableMonths: string[]
   hasActiveFilters: boolean
-  onCategoryChange: (category: TransactionFilterState["category"]) => void
-  onMonthChange: (month: string) => void
-  onQueryChange: (query: string) => void
+  onCategoryChange: (v: TransactionFilterState["category"]) => void
+  onMonthChange: (v: string) => void
+  onQueryChange: (v: string) => void
   onReset: () => void
-  onSortChange: (sort: TransactionSort) => void
-  onStatusChange: (status: TransactionFilterState["status"]) => void
+  onSortChange: (v: TransactionSort) => void
+  onStatusChange: (v: TransactionFilterState["status"]) => void
   state: TransactionFilterState
 }) {
+  const [expanded, setExpanded] = useState(state.month !== "all" || state.category !== "all" || Boolean(state.expenseCategoryId && state.expenseCategoryId !== "all"))
+  const months = Array.from(
+    new Set([...availableMonths, ...(state.month !== "all" ? [state.month] : [])]),
+  )
+    .sort()
+    .reverse()
   return (
-    <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-card">
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1.4fr)_auto_auto]">
-        <div className="relative">
-          <Search
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-          />
-          <Input
-            value={state.query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            className="pl-9"
-            placeholder="搜索标题，比如：差旅、办公、房租"
-          />
-        </div>
-
-        <select
-          className={nativeSelectClassName}
-          value={state.month}
-          onChange={(event) => onMonthChange(event.target.value)}
+    <section aria-label="账单筛选" className="flex flex-col gap-3">
+      <div className="flex gap-2">
+        <Input
+          aria-label="搜索账单标题"
+          type="search"
+          value={state.query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="搜索账单标题"
+        />
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label={expanded ? "收起更多筛选" : "展开更多筛选"}
+          aria-expanded={expanded}
+          onClick={() => setExpanded((v) => !v)}
         >
-          <option value="all">全部月份</option>
-          {availableMonths.map((month) => (
-            <option key={month} value={month}>
-              {month}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className={nativeSelectClassName}
-          value={state.sort}
-          onChange={(event) => onSortChange(event.target.value as TransactionSort)}
-        >
-          {Object.entries(sortLabels).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
+          <SlidersHorizontal />
+        </Button>
       </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        {statusOptions.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            onClick={() => onStatusChange(option.value)}
-            className={cn(
-              "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-              state.status === option.value
-                ? "border-slate-950 bg-slate-950 text-white"
-                : "border-slate-200 bg-slate-50 text-slate-500 hover:border-slate-300 hover:text-slate-700",
-            )}
+      <ToggleGroup
+        type="single"
+        value={state.status}
+        onValueChange={(v) => {
+          if (v) onStatusChange(v as TransactionFilterState["status"])
+        }}
+        aria-label="账单状态"
+        className="flex flex-wrap justify-start gap-1"
+      >
+        {statusOptions.map((o) => (
+          <ToggleGroupItem
+            key={o.value}
+            value={o.value}
+            variant="outline"
+            className="min-h-11 px-2 text-xs sm:min-h-9"
           >
-            {option.label}
-          </button>
+            {o.label}
+          </ToggleGroupItem>
         ))}
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-        <div className="flex flex-wrap gap-2">
-          {categoryOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => onCategoryChange(option.value)}
-              className={cn(
-                "rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                state.category === option.value
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-700",
-              )}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        {hasActiveFilters && (
+      </ToggleGroup>
+      <Collapsible open={expanded} onOpenChange={setExpanded}>
+        <CollapsibleTrigger className="sr-only">更多筛选</CollapsibleTrigger>
+        <CollapsibleContent>
+          <FieldGroup className="gap-3">
+            <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor="filter-month">月份</FieldLabel>
+                <select
+                  id="filter-month"
+                  value={state.month}
+                  onChange={(e) => onMonthChange(e.target.value)}
+                  className="h-10 w-full rounded-md border bg-background px-2 text-sm"
+                >
+                  <option value="all">全部月份</option>
+                  {months.map((m) => (
+                    <option key={m} value={m}>
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="filter-sort">排序</FieldLabel>
+                <select
+                  id="filter-sort"
+                  value={state.sort}
+                  onChange={(e) => onSortChange(e.target.value as TransactionSort)}
+                  className="h-10 w-full rounded-md border bg-background px-2 text-sm"
+                >
+                  {Object.entries(sorts).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            </div>
+            <Field>
+              <FieldLabel>账单类型</FieldLabel>
+              <ToggleGroup
+                type="single"
+                value={state.category}
+                onValueChange={(v) => {
+                  if (v) onCategoryChange(v as TransactionFilterState["category"])
+                }}
+                aria-label="账单类型"
+                className="justify-start"
+              >
+                <ToggleGroupItem value="all">全部类型</ToggleGroupItem>
+                <ToggleGroupItem value="work">工作垫付</ToggleGroupItem>
+                <ToggleGroupItem value="personal">个人支出</ToggleGroupItem>
+              </ToggleGroup>
+            </Field>
+            {onExpenseCategoryChange && availableExpenseCategories.length > 0 && <Field><FieldLabel htmlFor="filter-expense-category">支出分类</FieldLabel><select id="filter-expense-category" className="h-11 w-full rounded-md border bg-background px-2 text-sm" value={state.expenseCategoryId ?? "all"} onChange={e => onExpenseCategoryChange(e.target.value)}><option value="all">全部分类</option><option value="uncategorized">未分类</option>{availableExpenseCategories.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></Field>}
+          </FieldGroup>
+        </CollapsibleContent>
+      </Collapsible>
+      {hasActiveFilters && (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>
+            {state.month !== "all" ? `${state.month} · ` : ""}
+            {state.category !== "all"
+              ? state.category === "work"
+                ? "工作垫付 · "
+                : "个人支出 · "
+              : ""}
+            已应用筛选
+          </span>
           <Button variant="ghost" size="sm" onClick={onReset}>
-            <X size={14} />
             清空筛选
           </Button>
-        )}
-      </div>
+        </div>
+      )}
     </section>
   )
 }

@@ -24,7 +24,7 @@ export function useActivityFeed({
       id: `salary-${salaryLog.id}`,
       kind: "salary",
       title: salaryLog.remark?.trim() || `${salaryLog.month} 回款记录`,
-      meta: `${salaryLog.source} · ${salaryLog.month}`,
+      meta: `${{ salary: "工资", reimbursement: "报销", other: "其他收入" }[salaryLog.source]} · ${salaryLog.month}`,
       amount: salaryLog.amount,
       date: salaryLog.received_date,
     }))

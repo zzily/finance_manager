@@ -1,5 +1,8 @@
-import { useMemo, useState, type ReactNode } from "react"
+import { useId, useMemo, useState, type ReactNode } from "react"
 
+import { Field as ShadcnField, FieldLabel } from "../ui/field"
+import { labelControl } from "../../lib/formHelpers"
+import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group"
 import { ErrorBox } from "../common"
 import { Badge } from "../ui/badge"
 import { Button } from "../ui/button"
@@ -12,13 +15,7 @@ import {
   DialogTitle,
 } from "../ui/dialog"
 import { Input } from "../ui/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
 import {
   TRADE_EXECUTION_QUALITY_OPTIONS,
   TRADE_MARKET_OPTIONS,
@@ -87,7 +84,7 @@ type TradeRecordFormValue = {
 }
 
 const TEXTAREA_CLASS_NAME =
-  "min-h-[110px] w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2"
+  "min-h-[110px] w-full rounded-md border border-border bg-card px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
 
 function getTodayKey() {
   const now = new Date()
@@ -309,23 +306,16 @@ function getComputedGrossPnl({
   return (parsedExitPrice - parsedEntryPrice) * parsedPositionSize * directionMultiplier
 }
 
-function Field({
-  children,
-  label,
-  hint,
-}: {
-  children: ReactNode
-  label: string
-  hint?: string
-}) {
+function Field({ children, label, hint }: { children: ReactNode; label: string; hint?: string }) {
+  const id = useId()
   return (
-    <div className="space-y-1.5">
+    <ShadcnField className="gap-1.5">
       <div className="flex items-center justify-between gap-3">
-        <label className="text-xs font-medium text-slate-500">{label}</label>
-        {hint ? <span className="text-[11px] text-slate-400">{hint}</span> : null}
+        <FieldLabel htmlFor={id}>{label}</FieldLabel>
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
-      {children}
-    </div>
+      {labelControl(children, id, label)}
+    </ShadcnField>
   )
 }
 
@@ -339,10 +329,10 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-3xl border border-slate-200 bg-slate-50/70 p-4">
+    <section className="rounded-3xl border border-border bg-muted/70 p-4">
       <div className="mb-4">
-        <p className="text-sm font-semibold text-slate-900">{title}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>
+        <p className="text-sm font-semibold text-foreground">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
       </div>
       {children}
     </section>
@@ -363,6 +353,7 @@ export function TradeRecordDialog({
   isPending: boolean
 }) {
   const [form, setForm] = useState<TradeRecordFormValue>(() => toFormValue(record))
+  const [detailed, setDetailed] = useState(Boolean(record))
   const [error, setError] = useState<string | null>(null)
   const derivedOptionPremiumType: TradePremiumType | null =
     form.market === "options" ? getDerivedOptionPremiumType(form.side) : null
@@ -409,6 +400,7 @@ export function TradeRecordDialog({
   }
 
   function handleSubmit() {
+    if (isPending) return
     if (!form.symbol.trim()) {
       setError("请输入标的名称或代码")
       return
@@ -487,27 +479,22 @@ export function TradeRecordDialog({
       actual_target: parseOptionalNumber(form.actual_target, "实际止盈").value,
       fees: parsedFees,
       slippage: parsedSlippage,
-      followed_plan:
-        form.followed_plan === "unknown" ? null : form.followed_plan === "true",
+      followed_plan: form.followed_plan === "unknown" ? null : form.followed_plan === "true",
       plan_clarity: form.plan_clarity === "unknown" ? null : form.plan_clarity,
-      execution_quality:
-        form.execution_quality === "unknown" ? null : form.execution_quality,
+      execution_quality: form.execution_quality === "unknown" ? null : form.execution_quality,
       mistake_tags: form.mistake_tags,
       lesson: form.lesson.trim() ? form.lesson.trim() : null,
       option_expiration:
         form.market === "options" && form.option_expiration ? form.option_expiration : null,
       option_strike:
-        form.market === "options"
-          ? parseOptionalNumber(form.option_strike, "行权价").value
-          : null,
+        form.market === "options" ? parseOptionalNumber(form.option_strike, "行权价").value : null,
       option_right:
         form.market === "options" && form.option_right !== "unknown" ? form.option_right : null,
       option_structure:
         form.market === "options" && form.option_structure !== "unknown"
           ? form.option_structure
           : null,
-      option_premium_type:
-        derivedOptionPremiumType,
+      option_premium_type: derivedOptionPremiumType,
       option_max_risk:
         form.market === "options"
           ? parseOptionalNumber(form.option_max_risk, "最大风险").value
@@ -517,9 +504,7 @@ export function TradeRecordDialog({
           ? parseOptionalNumber(form.option_max_reward, "最大收益").value
           : null,
       option_delta:
-        form.market === "options"
-          ? parseOptionalNumber(form.option_delta, "Delta").value
-          : null,
+        form.market === "options" ? parseOptionalNumber(form.option_delta, "Delta").value : null,
     })
   }
 
@@ -527,613 +512,790 @@ export function TradeRecordDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto rounded-[28px] p-0">
-        <div className="border-b border-slate-200 bg-white px-6 py-5">
+      <DialogContent className="flex max-h-[90dvh] max-w-3xl flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 border-b bg-card px-4 py-4">
           <DialogHeader>
             <DialogTitle>{isEdit ? "编辑交易记录" : "新增交易记录"}</DialogTitle>
             <DialogDescription>
-              把执行数据、计划和复盘一次记全，页面会自动计算 Expectancy、Profit Factor、最大回撤和按场景拆解结果。
+              先记录标的与盈亏；价格、策略和复盘可以稍后补充。盈亏金额统一使用人民币。
             </DialogDescription>
           </DialogHeader>
         </div>
 
-        <div className="space-y-4 bg-white px-6 py-5">
-          <Section
-            title="基本信息"
-            description="先把交易对象、市场和策略标签定下来，后面才能按 setup / 标的 / 品种拆解表现。"
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-card px-4 py-4">
+          <ToggleGroup
+            type="single"
+            value={detailed ? "detailed" : "quick"}
+            onValueChange={(value) => {
+              if (value) setDetailed(value === "detailed")
+            }}
+            aria-label="录入方式"
+            className="justify-start"
           >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Field label="标的">
-                <Input
-                  autoFocus
-                  value={form.symbol}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, symbol: event.target.value }))
-                  }
-                  placeholder="例如：SPY / NVDA / BTCUSDT"
-                />
-              </Field>
-
+            <ToggleGroupItem value="quick">快速记录</ToggleGroupItem>
+            <ToggleGroupItem value="detailed">详细复盘</ToggleGroupItem>
+          </ToggleGroup>
+          {!detailed ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <Field label="标的">
+                  <Input
+                    autoFocus
+                    value={form.symbol}
+                    onChange={(e) => setForm((prev) => ({ ...prev, symbol: e.target.value }))}
+                    placeholder="例如：SPY / BTCUSDT"
+                  />
+                </Field>
+              </div>
               <Field label="交易日期">
                 <Input
                   type="date"
                   value={form.traded_at}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, traded_at: event.target.value }))
-                  }
+                  onChange={(e) => setForm((prev) => ({ ...prev, traded_at: e.target.value }))}
                 />
               </Field>
-
-              <Field label={form.market === "options" ? "开仓方式" : "方向"}>
-                <Select
-                  value={form.side}
-                  onValueChange={(value) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      side: value as TradeRecordInput["side"],
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={form.market === "options" ? "请选择开仓方式" : "请选择方向"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(form.market === "options"
-                      ? [
-                          { value: "long", label: "买入开仓" },
-                          { value: "short", label: "卖出开仓" },
-                        ]
-                      : TRADE_SIDE_OPTIONS
-                    ).map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
               <Field label="市场">
-                <Select
+                <select
+                  className="h-11 w-full rounded-md border bg-background px-2 text-sm"
                   value={form.market}
-                  onValueChange={(value) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      market: value as TradeRecordInput["market"],
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      market: e.target.value as TradeRecordInput["market"],
                     }))
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue placeholder="请选择市场" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRADE_MARKET_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {TRADE_MARKET_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
-
-              <Field label="策略 / setup" hint="用于统计">
-                <Input
-                  value={form.setup}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, setup: event.target.value }))
+              <Field label={form.market === "options" ? "开仓方式" : "方向"}>
+                <select
+                  className="h-11 w-full rounded-md border bg-background px-2 text-sm"
+                  value={form.side}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      side: e.target.value as TradeRecordInput["side"],
+                    }))
                   }
-                  placeholder="例如：Opening range breakout"
-                />
+                >
+                  {TRADE_SIDE_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {form.market === "options"
+                        ? o.value === "long"
+                          ? "买入开仓"
+                          : "卖出开仓"
+                        : o.label}
+                    </option>
+                  ))}
+                </select>
               </Field>
-
-              <div className="md:col-span-2 xl:col-span-3">
-                <Field label="开仓理由" hint="交易逻辑">
-                  <textarea
-                    value={form.thesis}
-                    onChange={(event) =>
-                      setForm((previous) => ({ ...previous, thesis: event.target.value }))
-                    }
-                    placeholder="入场触发条件、市场背景、预期路径"
-                    className={TEXTAREA_CLASS_NAME}
-                  />
-                </Field>
-              </div>
-            </div>
-          </Section>
-
-          <Section
-            title="执行数据"
-            description="记录进出场、仓位和成本，统计才不会只剩下一个结果数字。"
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Field label="入场时间" hint="可精确到分钟">
-                <Input
-                  type="datetime-local"
-                  value={form.entry_at}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, entry_at: event.target.value }))
-                  }
-                />
-              </Field>
-
-              <Field label="出场时间" hint="可留空">
-                <Input
-                  type="datetime-local"
-                  value={form.exit_at}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, exit_at: event.target.value }))
-                  }
-                />
-              </Field>
-
-              <Field label="入场价">
+              <Field label="盈亏（人民币）" hint="亏损填负数">
                 <Input
                   type="number"
-                  step="0.0001"
-                  value={form.entry_price}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, entry_price: event.target.value }))
-                  }
-                  placeholder="例如：518.2"
-                />
-              </Field>
-
-              <Field label="出场价">
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={form.exit_price}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, exit_price: event.target.value }))
-                  }
-                  placeholder="例如：521.6"
-                />
-              </Field>
-
-              <Field label="仓位大小" hint="股数 / 合约数">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={form.position_size}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, position_size: event.target.value }))
-                  }
-                  placeholder="例如：2 / 100"
-                />
-              </Field>
-
-              <Field label="交易盈亏" hint="未扣费用">
-                <Input
-                  type="number"
+                  inputMode="decimal"
                   step="0.01"
                   value={form.pnl}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, pnl: event.target.value }))
-                  }
-                  placeholder="正数盈利，负数亏损"
+                  onChange={(e) => setForm((prev) => ({ ...prev, pnl: e.target.value }))}
+                  placeholder="例如：-200"
                 />
               </Field>
-
-              <Field label="手续费">
+              <Field label="手续费（可选）">
                 <Input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
+                  min="0"
                   value={form.fees}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, fees: event.target.value }))
-                  }
-                  placeholder="例如：5.6"
+                  onChange={(e) => setForm((prev) => ({ ...prev, fees: e.target.value }))}
+                  placeholder="0.00"
                 />
               </Field>
-
-              <Field label="滑点">
+              <Field label="滑点（可选）">
                 <Input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
+                  min="0"
                   value={form.slippage}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, slippage: event.target.value }))
-                  }
-                  placeholder="例如：2.4"
+                  onChange={(e) => setForm((prev) => ({ ...prev, slippage: e.target.value }))}
+                  placeholder="0.00"
                 />
               </Field>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
-              {computedGrossPnl !== null ? (
-                <>
-                  <Badge variant="success">自动毛盈亏</Badge>
-                  <span className="text-slate-500">
-                    {getGrossPnlContextLabel({
-                      market: form.market,
-                      side: form.side,
-                    })}
-                    ，用
-                    {" "}
-                    {getGrossPnlFormulaLabel({
-                      market: form.market,
-                      side: form.side,
-                    })}
-                    {" "}
-                    自动估算
-                  </span>
-                  <span className={cn("font-semibold", computedGrossPnl >= 0 ? "text-emerald-700" : "text-red-700")}>
-                    {formatCurrencyValue(computedGrossPnl)}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setForm((previous) => ({
-                        ...previous,
-                        pnl: `${Number(computedGrossPnl.toFixed(2))}`,
-                      }))
-                    }
-                  >
-                    回填到交易盈亏
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Badge variant="secondary">自动毛盈亏</Badge>
-                  <span className="text-slate-500">
-                    补齐入场价、出场价和仓位后，可一键回填交易盈亏。
-                  </span>
-                </>
-              )}
-            </div>
-
-            <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
-              <Badge variant="info">自动净结果</Badge>
-              <span className="text-slate-500">
-                {(form.pnl.trim().length > 0 ? "交易盈亏" : computedGrossPnl !== null ? "自动毛盈亏" : "交易盈亏") +
-                  " - 手续费 - 滑点"}
-              </span>
-              <span className="font-semibold text-slate-900">
-                {netPreview === null ? "请输入有效数字" : currency.format(netPreview)}
-              </span>
-            </div>
-          </Section>
-
-          <Section
-            title="交易计划"
-            description="把计划止损、计划止盈和实际执行写下来，后面才能判断亏损是系统问题还是执行问题。"
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <Field label="计划止损">
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={form.planned_stop}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, planned_stop: event.target.value }))
-                  }
-                  placeholder="预设止损位"
-                />
-              </Field>
-
-              <Field label="计划止盈">
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={form.planned_target}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, planned_target: event.target.value }))
-                  }
-                  placeholder="预设止盈位"
-                />
-              </Field>
-
-              <Field label="实际止损">
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={form.actual_stop}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, actual_stop: event.target.value }))
-                  }
-                  placeholder="实际离场止损"
-                />
-              </Field>
-
-              <Field label="实际止盈">
-                <Input
-                  type="number"
-                  step="0.0001"
-                  value={form.actual_target}
-                  onChange={(event) =>
-                    setForm((previous) => ({ ...previous, actual_target: event.target.value }))
-                  }
-                  placeholder="实际离场止盈"
-                />
-              </Field>
-
-              <Field label="是否按计划执行">
-                <Select
-                  value={form.followed_plan}
-                  onValueChange={(value) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      followed_plan: value as BooleanSelectValue,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="请选择" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unknown">暂不标记</SelectItem>
-                    <SelectItem value="true">基本按计划</SelectItem>
-                    <SelectItem value="false">明显偏离</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field label="计划是否清晰">
-                <Select
-                  value={form.plan_clarity}
-                  onValueChange={(value) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      plan_clarity: value as NullablePlanClarity,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="请选择" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unknown">暂不标记</SelectItem>
-                    {TRADE_PLAN_CLARITY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-
-              <Field label="执行是否合规">
-                <Select
-                  value={form.execution_quality}
-                  onValueChange={(value) =>
-                    setForm((previous) => ({
-                      ...previous,
-                      execution_quality: value as NullableExecutionQuality,
-                    }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="请选择" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="unknown">暂不标记</SelectItem>
-                    {TRADE_EXECUTION_QUALITY_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-          </Section>
-
-          <Section
-            title="复盘结论"
-            description="不要只写亏了还是赚了，而是写出错误类型和这笔交易唯一值得记住的结论。"
-          >
-            <div className="grid gap-4">
-              <Field label="错误类型" hint="可多选">
-                <div className="flex flex-wrap gap-2">
-                  {TRADE_MISTAKE_OPTIONS.map((option) => {
-                    const selected = form.mistake_tags.includes(option.value)
-
-                    return (
-                      <Button
-                        key={option.value}
-                        type="button"
-                        variant={selected ? "secondary" : "outline"}
-                        size="sm"
-                        onClick={() => toggleMistakeTag(option.value)}
-                      >
-                        {option.label}
-                      </Button>
-                    )
-                  })}
-                </div>
-              </Field>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <Field label="唯一结论">
-                  <textarea
-                    value={form.lesson}
-                    onChange={(event) =>
-                      setForm((previous) => ({ ...previous, lesson: event.target.value }))
-                    }
-                    placeholder="例如：突破失败时不该在第二次回抽继续追多"
-                    className={TEXTAREA_CLASS_NAME}
-                  />
-                </Field>
-
-                <Field label="补充备注">
-                  <textarea
-                    value={form.note}
-                    onChange={(event) =>
-                      setForm((previous) => ({ ...previous, note: event.target.value }))
-                    }
-                    placeholder="可继续写当天情绪、执行亮点或遗漏信息"
-                    className={TEXTAREA_CLASS_NAME}
-                  />
-                </Field>
+              <div className="col-span-2 rounded-md bg-muted p-3 text-sm">
+                预计净盈亏：
+                <strong className="tabular-nums">
+                  {form.pnl.trim() && netPreview !== null
+                    ? formatCurrencyValue(netPreview)
+                    : "等待录入"}
+                </strong>
               </div>
-
-              {form.mistake_tags.length > 0 ? (
-                <div className="flex flex-wrap gap-2">
-                  {form.mistake_tags.map((tag) => (
-                    <Badge key={tag} variant="warning">
-                      {TRADE_MISTAKE_LABELS[tag]}
-                    </Badge>
-                  ))}
-                </div>
-              ) : null}
             </div>
-          </Section>
+          ) : (
+            <>
+              <Section
+                title="基本信息"
+                description="先把交易对象、市场和策略标签定下来，后面才能按 setup / 标的 / 品种拆解表现。"
+              >
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="标的">
+                    <Input
+                      autoFocus
+                      value={form.symbol}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          symbol: event.target.value,
+                        }))
+                      }
+                      placeholder="例如：SPY / NVDA / BTCUSDT"
+                    />
+                  </Field>
 
-          {form.market === "options" ? (
-            <Section
-              title="期权字段"
-              description="至少先支持裸买、卖 put/call、价差和铁鹰，避免期权交易后面无法拆解。"
-            >
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <Field label="到期日">
-                  <Input
-                    type="date"
-                    value={form.option_expiration}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_expiration: event.target.value,
-                      }))
-                    }
-                  />
-                </Field>
+                  <Field label="交易日期">
+                    <Input
+                      type="date"
+                      value={form.traded_at}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          traded_at: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
 
-                <Field label="行权价">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.option_strike}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_strike: event.target.value,
-                      }))
-                    }
-                    placeholder="例如：520"
-                  />
-                </Field>
+                  <Field label={form.market === "options" ? "开仓方式" : "方向"}>
+                    <Select
+                      value={form.side}
+                      onValueChange={(value) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          side: value as TradeRecordInput["side"],
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue
+                          placeholder={form.market === "options" ? "请选择开仓方式" : "请选择方向"}
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(form.market === "options"
+                          ? [
+                              { value: "long", label: "买入开仓" },
+                              { value: "short", label: "卖出开仓" },
+                            ]
+                          : TRADE_SIDE_OPTIONS
+                        ).map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
 
-                <Field label="Call / Put">
-                  <Select
-                    value={form.option_right}
-                    onValueChange={(value) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_right: value as NullableOptionRight,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="请选择" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unknown">暂不标记</SelectItem>
-                      {TRADE_OPTION_RIGHT_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+                  <Field label="市场">
+                    <Select
+                      value={form.market}
+                      onValueChange={(value) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          market: value as TradeRecordInput["market"],
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="请选择市场" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TRADE_MARKET_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
 
-                <Field label="结构">
-                  <Select
-                    value={form.option_structure}
-                    onValueChange={(value) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_structure: value as NullableOptionStructure,
-                      }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="请选择" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="unknown">暂不标记</SelectItem>
-                      {TRADE_OPTION_STRUCTURE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+                  <Field label="策略 / setup" hint="用于统计">
+                    <Input
+                      value={form.setup}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          setup: event.target.value,
+                        }))
+                      }
+                      placeholder="例如：Opening range breakout"
+                    />
+                  </Field>
 
-                <Field label="开仓现金流" hint="系统自动推导">
-                  <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant={derivedOptionPremiumType === "credit" ? "warning" : "info"}>
-                        {getOptionCashflowLabel(form.side)}
-                      </Badge>
-                      <span className="font-medium text-slate-900">
-                        {getOptionEntryTypeLabel(form.side)}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">
-                      系统会同步标记为
-                      {" "}
-                      {derivedOptionPremiumTypeLabel}
-                      ，用于后续按期权策略拆解统计。
-                    </p>
+                  <div className="md:col-span-2 xl:col-span-3">
+                    <Field label="开仓理由" hint="交易逻辑">
+                      <textarea
+                        value={form.thesis}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            thesis: event.target.value,
+                          }))
+                        }
+                        placeholder="入场触发条件、市场背景、预期路径"
+                        className={TEXTAREA_CLASS_NAME}
+                      />
+                    </Field>
                   </div>
-                </Field>
+                </div>
+              </Section>
 
-                <Field label="最大风险">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.option_max_risk}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_max_risk: event.target.value,
-                      }))
-                    }
-                    placeholder="例如：350"
-                  />
-                </Field>
+              <Section
+                title="执行数据"
+                description="记录进出场、仓位和成本，统计才不会只剩下一个结果数字。"
+              >
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="入场时间" hint="可精确到分钟">
+                    <Input
+                      type="datetime-local"
+                      value={form.entry_at}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          entry_at: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
 
-                <Field label="最大收益">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.option_max_reward}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_max_reward: event.target.value,
-                      }))
-                    }
-                    placeholder="例如：150"
-                  />
-                </Field>
+                  <Field label="出场时间" hint="可留空">
+                    <Input
+                      type="datetime-local"
+                      value={form.exit_at}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          exit_at: event.target.value,
+                        }))
+                      }
+                    />
+                  </Field>
 
-                <Field label="Delta">
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={form.option_delta}
-                    onChange={(event) =>
-                      setForm((previous) => ({
-                        ...previous,
-                        option_delta: event.target.value,
-                      }))
-                    }
-                    placeholder="例如：0.32"
-                  />
-                </Field>
-              </div>
-            </Section>
-          ) : null}
+                  <Field label="入场价">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={form.entry_price}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          entry_price: event.target.value,
+                        }))
+                      }
+                      placeholder="例如：518.2"
+                    />
+                  </Field>
 
-          {error && <ErrorBox msg={error} />}
+                  <Field label="出场价">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={form.exit_price}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          exit_price: event.target.value,
+                        }))
+                      }
+                      placeholder="例如：521.6"
+                    />
+                  </Field>
+
+                  <Field label="仓位大小" hint="股数 / 合约数">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={form.position_size}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          position_size: event.target.value,
+                        }))
+                      }
+                      placeholder="例如：2 / 100"
+                    />
+                  </Field>
+
+                  <Field label="交易盈亏" hint="未扣费用">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={form.pnl}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          pnl: event.target.value,
+                        }))
+                      }
+                      placeholder="正数盈利，负数亏损"
+                    />
+                  </Field>
+
+                  <Field label="手续费">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={form.fees}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          fees: event.target.value,
+                        }))
+                      }
+                      placeholder="例如：5.6"
+                    />
+                  </Field>
+
+                  <Field label="滑点">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={form.slippage}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          slippage: event.target.value,
+                        }))
+                      }
+                      placeholder="例如：2.4"
+                    />
+                  </Field>
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm">
+                  {computedGrossPnl !== null ? (
+                    <>
+                      <Badge variant="success">自动毛盈亏</Badge>
+                      <span className="text-muted-foreground">
+                        {getGrossPnlContextLabel({
+                          market: form.market,
+                          side: form.side,
+                        })}
+                        ，用{" "}
+                        {getGrossPnlFormulaLabel({
+                          market: form.market,
+                          side: form.side,
+                        })}{" "}
+                        自动估算
+                      </span>
+                      <span
+                        className={cn(
+                          "font-semibold",
+                          computedGrossPnl >= 0 ? "text-emerald-700" : "text-red-700",
+                        )}
+                      >
+                        {formatCurrencyValue(computedGrossPnl)}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setForm((previous) => ({
+                            ...previous,
+                            pnl: `${Number(computedGrossPnl.toFixed(2))}`,
+                          }))
+                        }
+                      >
+                        回填到交易盈亏
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Badge variant="secondary">自动毛盈亏</Badge>
+                      <span className="text-muted-foreground">
+                        补齐入场价、出场价和仓位后，可一键回填交易盈亏。
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm">
+                  <Badge variant="info">自动净结果</Badge>
+                  <span className="text-muted-foreground">
+                    {(form.pnl.trim().length > 0
+                      ? "交易盈亏"
+                      : computedGrossPnl !== null
+                        ? "自动毛盈亏"
+                        : "交易盈亏") + " - 手续费 - 滑点"}
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {netPreview === null ? "请输入有效数字" : currency.format(netPreview)}
+                  </span>
+                </div>
+              </Section>
+
+              <Section
+                title="交易计划"
+                description="把计划止损、计划止盈和实际执行写下来，后面才能判断亏损是系统问题还是执行问题。"
+              >
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                  <Field label="计划止损">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={form.planned_stop}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          planned_stop: event.target.value,
+                        }))
+                      }
+                      placeholder="预设止损位"
+                    />
+                  </Field>
+
+                  <Field label="计划止盈">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={form.planned_target}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          planned_target: event.target.value,
+                        }))
+                      }
+                      placeholder="预设止盈位"
+                    />
+                  </Field>
+
+                  <Field label="实际止损">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={form.actual_stop}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          actual_stop: event.target.value,
+                        }))
+                      }
+                      placeholder="实际离场止损"
+                    />
+                  </Field>
+
+                  <Field label="实际止盈">
+                    <Input
+                      type="number"
+                      step="0.0001"
+                      value={form.actual_target}
+                      onChange={(event) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          actual_target: event.target.value,
+                        }))
+                      }
+                      placeholder="实际离场止盈"
+                    />
+                  </Field>
+
+                  <Field label="是否按计划执行">
+                    <Select
+                      value={form.followed_plan}
+                      onValueChange={(value) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          followed_plan: value as BooleanSelectValue,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="请选择" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unknown">暂不标记</SelectItem>
+                        <SelectItem value="true">基本按计划</SelectItem>
+                        <SelectItem value="false">明显偏离</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field label="计划是否清晰">
+                    <Select
+                      value={form.plan_clarity}
+                      onValueChange={(value) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          plan_clarity: value as NullablePlanClarity,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="请选择" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unknown">暂不标记</SelectItem>
+                        {TRADE_PLAN_CLARITY_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+
+                  <Field label="执行是否合规">
+                    <Select
+                      value={form.execution_quality}
+                      onValueChange={(value) =>
+                        setForm((previous) => ({
+                          ...previous,
+                          execution_quality: value as NullableExecutionQuality,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="请选择" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unknown">暂不标记</SelectItem>
+                        {TRADE_EXECUTION_QUALITY_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+              </Section>
+
+              <Section
+                title="复盘结论"
+                description="不要只写亏了还是赚了，而是写出错误类型和这笔交易唯一值得记住的结论。"
+              >
+                <div className="grid gap-4">
+                  <Field label="错误类型" hint="可多选">
+                    <div className="flex flex-wrap gap-2">
+                      {TRADE_MISTAKE_OPTIONS.map((option) => {
+                        const selected = form.mistake_tags.includes(option.value)
+
+                        return (
+                          <Button
+                            key={option.value}
+                            type="button"
+                            variant={selected ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() => toggleMistakeTag(option.value)}
+                          >
+                            {option.label}
+                          </Button>
+                        )
+                      })}
+                    </div>
+                  </Field>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="唯一结论">
+                      <textarea
+                        value={form.lesson}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            lesson: event.target.value,
+                          }))
+                        }
+                        placeholder="例如：突破失败时不该在第二次回抽继续追多"
+                        className={TEXTAREA_CLASS_NAME}
+                      />
+                    </Field>
+
+                    <Field label="补充备注">
+                      <textarea
+                        value={form.note}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            note: event.target.value,
+                          }))
+                        }
+                        placeholder="可继续写当天情绪、执行亮点或遗漏信息"
+                        className={TEXTAREA_CLASS_NAME}
+                      />
+                    </Field>
+                  </div>
+
+                  {form.mistake_tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {form.mistake_tags.map((tag) => (
+                        <Badge key={tag} variant="warning">
+                          {TRADE_MISTAKE_LABELS[tag]}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </Section>
+
+              {form.market === "options" ? (
+                <Section
+                  title="期权字段"
+                  description="至少先支持裸买、卖 put/call、价差和铁鹰，避免期权交易后面无法拆解。"
+                >
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <Field label="到期日">
+                      <Input
+                        type="date"
+                        value={form.option_expiration}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            option_expiration: event.target.value,
+                          }))
+                        }
+                      />
+                    </Field>
+
+                    <Field label="行权价">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={form.option_strike}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            option_strike: event.target.value,
+                          }))
+                        }
+                        placeholder="例如：520"
+                      />
+                    </Field>
+
+                    <Field label="Call / Put">
+                      <Select
+                        value={form.option_right}
+                        onValueChange={(value) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            option_right: value as NullableOptionRight,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="请选择" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unknown">暂不标记</SelectItem>
+                          {TRADE_OPTION_RIGHT_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field label="结构">
+                      <Select
+                        value={form.option_structure}
+                        onValueChange={(value) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            option_structure: value as NullableOptionStructure,
+                          }))
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="请选择" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unknown">暂不标记</SelectItem>
+                          {TRADE_OPTION_STRUCTURE_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+
+                    <Field label="开仓现金流" hint="系统自动推导">
+                      <div className="rounded-2xl border border-border bg-card px-3 py-3 text-sm">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant={derivedOptionPremiumType === "credit" ? "warning" : "info"}
+                          >
+                            {getOptionCashflowLabel(form.side)}
+                          </Badge>
+                          <span className="font-medium text-foreground">
+                            {getOptionEntryTypeLabel(form.side)}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                          系统会同步标记为 {derivedOptionPremiumTypeLabel}
+                          ，用于后续按期权策略拆解统计。
+                        </p>
+                      </div>
+                    </Field>
+
+                    <Field label="最大风险">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={form.option_max_risk}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            option_max_risk: event.target.value,
+                          }))
+                        }
+                        placeholder="例如：350"
+                      />
+                    </Field>
+
+                    <Field label="最大收益">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={form.option_max_reward}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            option_max_reward: event.target.value,
+                          }))
+                        }
+                        placeholder="例如：150"
+                      />
+                    </Field>
+
+                    <Field label="Delta">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={form.option_delta}
+                        onChange={(event) =>
+                          setForm((previous) => ({
+                            ...previous,
+                            option_delta: event.target.value,
+                          }))
+                        }
+                        placeholder="例如：0.32"
+                      />
+                    </Field>
+                  </div>
+                </Section>
+              ) : null}
+            </>
+          )}
         </div>
 
-        <div className="border-t border-slate-200 bg-white px-6 py-4">
+        <div className="shrink-0 space-y-3 border-t bg-card px-4 py-3">
+          {error && <ErrorBox msg={error} />}
           <DialogFooter>
             <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>
               取消

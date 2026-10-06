@@ -1,7 +1,14 @@
+import { fetchAllPages } from "../lib/pagination"
+import { useApiEndpoint } from "./useApiEndpoint"
 import { useMemo } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { api, getApiErrorMessage, unwrapResponseData } from "../lib/api"
+import {
+  api,
+  type ApiEndpointKey,
+  getApiErrorMessage,
+  unwrapResponseData,
+} from "../lib/api"
 import type {
   ApiResponse,
   IdPayload,
@@ -11,14 +18,12 @@ import type {
   SettleRequest,
 } from "../types"
 
-async function fetchAvailable() {
-  return unwrapResponseData(
-    api.get<ApiResponse<SalaryLog[]>>("/salary_logs/", { params: { available_only: true } }),
-  )
+async function fetchAvailable(endpoint:ApiEndpointKey) {
+ return fetchAllPages<SalaryLog>("/salary_logs/",endpoint, {available_only:true})
 }
 
-async function fetchAll() {
-  return unwrapResponseData(api.get<ApiResponse<SalaryLog[]>>("/salary_logs/"))
+async function fetchAll(endpoint:ApiEndpointKey) {
+ return fetchAllPages<SalaryLog>("/salary_logs/",endpoint)
 }
 
 async function createSalaryLogApi(p: SalaryLogCreate) {
@@ -38,16 +43,17 @@ async function settleDebtApi(p: SettleRequest) {
 }
 
 export function useSalaryLogs() {
+  const endpoint = useApiEndpoint()
   const queryClient = useQueryClient()
 
   const availableQuery = useQuery({
-    queryKey: ["salary_logs", "available"],
-    queryFn: fetchAvailable,
+    queryKey: ["salary_logs", endpoint, "available"],
+    queryFn: () => fetchAvailable(endpoint),
   })
 
   const allQuery = useQuery({
-    queryKey: ["salary_logs", "all"],
-    queryFn: fetchAll,
+    queryKey: ["salary_logs", endpoint, "all"],
+    queryFn: () => fetchAll(endpoint),
   })
 
   const invalidateAll = () =>
@@ -64,7 +70,9 @@ export function useSalaryLogs() {
       toast.success("回款已录入", { description: "资金池已更新" })
     },
     onError: (error) => {
-      toast.error("新增回款失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("新增回款失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 
@@ -75,7 +83,9 @@ export function useSalaryLogs() {
       toast.success("回款已更新", { description: "资金池已同步" })
     },
     onError: (error) => {
-      toast.error("更新失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("更新失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 
@@ -86,7 +96,9 @@ export function useSalaryLogs() {
       toast.success("回款记录已删除")
     },
     onError: (error) => {
-      toast.error("删除失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("删除失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 
@@ -97,7 +109,9 @@ export function useSalaryLogs() {
       toast.success("核销成功", { description: "账单已更新" })
     },
     onError: (error) => {
-      toast.error("核销失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("核销失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 

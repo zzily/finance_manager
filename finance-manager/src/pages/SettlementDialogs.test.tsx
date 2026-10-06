@@ -152,3 +152,7 @@ describe("SettlementDialogs", () => {
     expect(screen.getByText(deleteMessage)).toBeInTheDocument()
   })
 })
+
+vi.mock("../hooks/useBackendCapabilities",()=>({useBackendCapabilities:()=>({capabilities:{transactionOccurrenceDate:false}})}))
+
+vi.mock("../hooks/useExpenseCategories", () => ({ useExpenseCategories: () => ({ categories: [], query: { isError: false } }) }))

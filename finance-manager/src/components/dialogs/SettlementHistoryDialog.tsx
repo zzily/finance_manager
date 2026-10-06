@@ -1,12 +1,6 @@
 import { useState } from "react"
 import { History, Undo2, Loader2, AlertTriangle } from "lucide-react"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "../ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { currency } from "../../lib/formatters"
 import { useSettlements } from "../../hooks/useSettlements"
@@ -47,12 +41,7 @@ function UndoConfirm({
         账单欠款将相应增加。
       </p>
       <div className="flex items-center gap-2 pt-1">
-        <Button
-          size="sm"
-          variant="destructive"
-          disabled={isPending}
-          onClick={onConfirm}
-        >
+        <Button size="sm" variant="destructive" disabled={isPending} onClick={onConfirm}>
           {isPending && <Loader2 size={13} className="animate-spin" />}
           确认撤销
         </Button>
@@ -104,7 +93,7 @@ export function SettlementHistoryDialog({
         <div className="max-h-[400px] space-y-3 overflow-y-auto pr-1">
           {/* Loading */}
           {isLoading && (
-            <div className="flex items-center justify-center py-10 text-sm text-slate-400">
+            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
               <Loader2 size={16} className="mr-2 animate-spin" />
               加载中...
             </div>
@@ -119,28 +108,23 @@ export function SettlementHistoryDialog({
 
           {/* Empty */}
           {!isLoading && !isError && records.length === 0 && (
-            <div className="py-10 text-center text-sm text-slate-400">
-              暂无核销记录
-            </div>
+            <div className="py-10 text-center text-sm text-muted-foreground">暂无核销记录</div>
           )}
 
           {/* Records */}
           {records.map((r) => (
-            <div
-              key={r.id}
-              className="rounded-lg border border-slate-100 bg-slate-50/50 p-3 space-y-2"
-            >
+            <div key={r.id} className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold tabular-nums text-slate-900">
+                    <span className="text-sm font-bold tabular-nums text-foreground">
                       {currency.format(r.amount)}
                     </span>
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
                       {SOURCE_LABEL[r.salary_source] ?? r.salary_source}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     来源：{r.salary_month} · {formatDate(r.created_at)}
                   </p>
                 </div>

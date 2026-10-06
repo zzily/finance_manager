@@ -1,6 +1,13 @@
 import { useState } from "react"
 import { Pencil, Trash2, Loader2 } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog"
 import { Button } from "../ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
 import { Skeleton } from "../ui/skeleton"
@@ -40,13 +47,19 @@ export function SalaryPoolDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) setConfirmDeleteId(null); onOpenChange(v) }}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!v) setConfirmDeleteId(null)
+        onOpenChange(v)
+      }}
+    >
       <DialogContent className="max-w-3xl">
         <DialogHeader>
           <DialogTitle>资金池明细</DialogTitle>
-          <DialogDescription>查看、编辑或删除回款记录</DialogDescription>
+          <DialogDescription>查看、编辑或删除到账收入记录</DialogDescription>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-auto rounded-lg border border-slate-100">
+        <div className="max-h-[60vh] overflow-auto rounded-lg border border-border">
           <Table>
             <TableHeader>
               <TableRow>
@@ -60,28 +73,43 @@ export function SalaryPoolDialog({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {isLoading && Array.from({ length: 3 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-12" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-16" /></TableCell>
-                </TableRow>
-              ))}
+              {isLoading &&
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-12" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-20" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                  </TableRow>
+                ))}
               {isError && (
                 <TableRow>
                   <TableCell colSpan={7} className="py-8 text-center text-sm text-red-500">
-                    无法加载回款明细，请稍后重试
+                    无法加载收入明细，请稍后重试
                   </TableCell>
                 </TableRow>
               )}
-              {!isLoading && data.length === 0 && (
+              {!isLoading && !isError && data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-400">
-                    暂无回款记录
+                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
+                    暂无收入记录
                   </TableCell>
                 </TableRow>
               )}
@@ -91,22 +119,35 @@ export function SalaryPoolDialog({
                 const isConfirming = confirmDeleteId === log.id
                 return (
                   <TableRow key={log.id} className="group/row">
-                    <TableCell className="tabular-nums text-slate-700">{log.month}</TableCell>
+                    <TableCell className="tabular-nums text-foreground">{log.month}</TableCell>
                     <TableCell>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                        log.source === "salary" ? "bg-emerald-50 text-emerald-700" :
-                        log.source === "reimbursement" ? "bg-cyan-50 text-cyan-700" :
-                        "bg-slate-100 text-slate-600"
-                      }`}>
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          log.source === "salary"
+                            ? "bg-emerald-50 text-emerald-700"
+                            : log.source === "reimbursement"
+                              ? "bg-cyan-50 text-cyan-700"
+                              : "bg-muted text-muted-foreground"
+                        }`}
+                      >
                         {sourceLabel[log.source]}
                       </span>
                     </TableCell>
-                    <TableCell className="tabular-nums font-medium text-slate-900">{currency.format(log.amount)}</TableCell>
-                    <TableCell className="tabular-nums text-slate-500">{currency.format(used)}</TableCell>
-                    <TableCell className={`tabular-nums font-medium ${log.amount_unused > 0 ? "text-emerald-600" : "text-slate-400"}`}>
+                    <TableCell className="tabular-nums font-medium text-foreground">
+                      {currency.format(log.amount)}
+                    </TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {currency.format(used)}
+                    </TableCell>
+                    <TableCell
+                      className={`tabular-nums font-medium ${log.amount_unused > 0 ? "text-income" : "text-muted-foreground"}`}
+                    >
                       {currency.format(log.amount_unused)}
                     </TableCell>
-                    <TableCell className="max-w-[120px] truncate text-slate-500" title={log.remark || ""}>
+                    <TableCell
+                      className="max-w-[120px] truncate text-muted-foreground"
+                      title={log.remark || ""}
+                    >
                       {log.remark || "-"}
                     </TableCell>
                     <TableCell className="text-right">
@@ -134,7 +175,8 @@ export function SalaryPoolDialog({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className="text-slate-500 hover:text-slate-700"
+                            className="text-muted-foreground hover:text-foreground"
+                            aria-label={`编辑${log.month}${sourceLabel[log.source]}`}
                             onClick={() => onEdit(log)}
                           >
                             <Pencil size={13} />
@@ -142,11 +184,13 @@ export function SalaryPoolDialog({
                           <Button
                             size="sm"
                             variant="ghost"
-                            className={hasSettlements
-                              ? "cursor-not-allowed text-slate-300"
-                              : "text-red-500 hover:text-red-600"
+                            className={
+                              hasSettlements
+                                ? "cursor-not-allowed text-slate-300"
+                                : "text-red-500 hover:text-expense"
                             }
                             disabled={hasSettlements}
+                            aria-label={`删除${log.month}${sourceLabel[log.source]}`}
                             onClick={() => setConfirmDeleteId(log.id)}
                             title={hasSettlements ? "有核销记录，无法删除" : "删除此回款"}
                           >
@@ -162,7 +206,9 @@ export function SalaryPoolDialog({
           </Table>
         </div>
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>关闭</Button>
+          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+            关闭
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

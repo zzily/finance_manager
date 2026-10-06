@@ -71,7 +71,10 @@ describe("API envelope hooks", () => {
       expect(result.current.all).toHaveLength(2)
     })
 
-    expect(getSpy).toHaveBeenCalledWith("/transactions/")
+    expect(getSpy).toHaveBeenCalledWith("/transactions/", {
+      baseURL: "https://fastapi-0tu0.onrender.com",
+      params: {skip:0,limit:100},
+    })
     expect(result.current.all).toEqual(transactionsPayload)
     expect(result.current.unsettled).toEqual([transactionsPayload[0]])
   })
@@ -106,8 +109,14 @@ describe("API envelope hooks", () => {
       expect(result.current.available).toHaveLength(1)
     })
 
-    expect(getSpy).toHaveBeenCalledWith("/salary_logs/", { params: { available_only: true } })
-    expect(getSpy).toHaveBeenCalledWith("/salary_logs/")
+    expect(getSpy).toHaveBeenCalledWith("/salary_logs/", {
+      baseURL: "https://fastapi-0tu0.onrender.com",
+      params: { available_only: true,skip:0,limit:100 },
+    })
+    expect(getSpy).toHaveBeenCalledWith("/salary_logs/", {
+      baseURL: "https://fastapi-0tu0.onrender.com",
+      params: {skip:0,limit:100},
+    })
     expect(result.current.allLogs).toEqual(salaryPayload)
     expect(result.current.available).toEqual([salaryPayload[0]])
   })

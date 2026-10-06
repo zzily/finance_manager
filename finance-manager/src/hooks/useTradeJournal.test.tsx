@@ -102,7 +102,10 @@ describe("useTradeJournal", () => {
       expect(result.current.records).toHaveLength(1)
     })
 
-    expect(getSpy).toHaveBeenCalledWith("/trade_records/")
+    expect(getSpy).toHaveBeenCalledWith("/trade_records/", {
+      baseURL: "https://fastapi-0tu0.onrender.com",
+      params: {skip:0,limit:100},
+    })
     expect(result.current.records).toEqual(tradePayload)
   })
 

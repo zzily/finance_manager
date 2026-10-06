@@ -70,3 +70,18 @@ describe("useTransactionFilters", () => {
     expect(result.current.hasActiveFilters).toBe(false)
   })
 })
+
+it("filters by expense category and uses occurrence month instead of recording month", () => {
+  const { result } = renderHook(() => useTransactionFilters([{ ...transactions[0], occurred_at: "2026-02-28", expense_category_id: 9, expense_category_name: "差旅" }, transactions[1]]))
+  act(() => { result.current.setMonth("2026-02"); result.current.setExpenseCategoryId("9") })
+  expect(result.current.filteredTransactions.map(t => t.id)).toEqual([1])
+})
+
+it("clears an age-only navigation filter", () => {
+  window.history.replaceState(null, "", "#transactions?minAge=99999")
+  const { result } = renderHook(() => useTransactionFilters(transactions, true))
+  expect(result.current.filteredTransactions).toHaveLength(0)
+  act(() => result.current.resetFilters())
+  expect(result.current.filteredTransactions).toHaveLength(3)
+  window.history.replaceState(null, "", "#transactions")
+})

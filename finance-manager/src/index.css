@@ -3,19 +3,71 @@
 @tailwind utilities;
 
 @layer base {
-	body {
-		@apply bg-slate-50 text-slate-900;
-	}
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 16%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 20% 37%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 28% 88%;
+    --input: 214 28% 84%;
+    --ring: 222 47% 35%;
+    --income: 163 78% 28%;
+    --expense: 0 72% 45%;
+    --warning: 38 85% 35%;
+    --warning-foreground: 38 85% 22%;
+    --radius: 0.75rem;
+    --chart-1: 163 78% 35%;
+    --chart-2: 190 80% 35%;
+    --chart-3: 38 90% 45%;
+    --chart-4: 0 72% 45%;
+  }
+  * {
+    @apply border-border;
+  }
+  button svg {
+    flex-shrink: 0;
+  }
+  [data-icon] {
+    width: 1rem;
+    height: 1rem;
+  }
+  input[aria-invalid="true"],
+  textarea[aria-invalid="true"] {
+    @apply border-destructive;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 
-	/* Hide number input spinners */
-	input[type="number"]::-webkit-inner-spin-button,
-	input[type="number"]::-webkit-outer-spin-button {
-		-webkit-appearance: none;
-		margin: 0;
-	}
-	input[type="number"] {
-		-moz-appearance: textfield;
-		appearance: textfield;
-	}
+  body {
+    @apply bg-background text-foreground;
+  }
+
+  /* Hide number input spinners */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
 }
-
