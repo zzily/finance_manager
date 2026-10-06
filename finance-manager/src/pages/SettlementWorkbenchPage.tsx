@@ -1,418 +1,377 @@
+import { transactionDate } from "../lib/navigation"
 import { useMemo, useState } from "react"
-
-import { ArrowDownCircle, ArrowRight, Plus, Sparkles } from "lucide-react"
-
-import { CategoryBadge, ErrorBox, StatusBadge } from "../components/common"
+import { ArrowLeft, ArrowRight, CheckCircle2, Plus } from "lucide-react"
+import { CategoryBadge, StatusBadge } from "../components/common"
+import { QueryError } from "../components/common/QueryState"
+import { PageHeader } from "../components/common/PageHeader"
+import { Alert, AlertTitle, AlertDescription } from "../components/ui/alert"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card"
+import { ScrollArea } from "../components/ui/scroll-area"
 import { Button } from "../components/ui/button"
 import { Input } from "../components/ui/input"
+import { Field, FieldLabel, FieldError, FieldDescription } from "../components/ui/field"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "../components/ui/empty"
+import { moneyError } from "../lib/formHelpers"
 import { getApiErrorMessage } from "../lib/api"
 import { currency } from "../lib/formatters"
+import { cn } from "../lib/utils"
 import { useSalaryLogs } from "../hooks/useSalaryLogs"
 import { useTransactions } from "../hooks/useTransactions"
-import type { AppView } from "../layouts/appShell.types"
+import type { AppNavigate } from "../lib/navigation"
 import type { SalaryLog, Transaction } from "../types"
 import { SettlementDialogs } from "./SettlementDialogs"
 import { useSettlementPageState } from "./useSettlementPageState"
-
-function getRemainingDebt(transaction: Transaction) {
-  return transaction.amount_out - transaction.amount_reimbursed
+const due = (t: Transaction) => Math.max(0, t.amount_out - t.amount_reimbursed)
+const sourceLabel = {
+  salary: "工资",
+  reimbursement: "报销",
+  other: "其他收入",
 }
-
-function getRecommendedSalaryLog(
-  transaction: Transaction | null,
-  availableLogs: SalaryLog[],
-) {
-  if (!transaction || availableLogs.length === 0) {
-    return null
-  }
-
-  const remainingDebt = getRemainingDebt(transaction)
-  const sufficientLogs = [...availableLogs]
-    .filter((log) => log.amount_unused >= remainingDebt)
-    .sort((left, right) => left.amount_unused - right.amount_unused)
-
-  if (sufficientLogs.length > 0) {
-    return sufficientLogs[0]
-  }
-
-  return [...availableLogs].sort((left, right) => right.amount_unused - left.amount_unused)[0]
+function recommendSalary(transaction: Transaction | null, logs: SalaryLog[]) {
+  if (!transaction) return null
+  const matching = logs.filter(
+    (l) => l.source === (transaction.category === "work" ? "reimbursement" : "salary"),
+  )
+  const candidates = matching.length ? matching : logs
+  return (
+    [...candidates].sort((a, b) => {
+      const enoughA = a.amount_unused >= due(transaction),
+        enoughB = b.amount_unused >= due(transaction)
+      if (enoughA !== enoughB) return enoughA ? -1 : 1
+      return enoughA ? a.amount_unused - b.amount_unused : b.amount_unused - a.amount_unused
+    })[0] ?? null
+  )
 }
-
 export function SettlementWorkbenchPage({
   onNavigate,
+  initialTransactionId,
 }: {
-  onNavigate: (view: AppView) => void
+  onNavigate: AppNavigate
+  initialTransactionId?: number
 }) {
-  const transactions = useTransactions()
-  const salary = useSalaryLogs()
+  const transactions = useTransactions(),
+    salary = useSalaryLogs()
   const pageState = useSettlementPageState(transactions.all, transactions.unsettled)
-
   const queue = useMemo(
-    () =>
-      [...transactions.unsettled].sort(
-        (left, right) => getRemainingDebt(right) - getRemainingDebt(left),
-      ),
+    () => [...transactions.unsettled].sort((a, b) => transactionDate(a).localeCompare(transactionDate(b))),
     [transactions.unsettled],
   )
-  const availableLogs = useMemo(
-    () => [...salary.available].sort((left, right) => right.amount_unused - left.amount_unused),
-    [salary.available],
-  )
-
-  const [preferredTransactionId, setPreferredTransactionId] = useState<number | null>(null)
-  const [preferredSalaryId, setPreferredSalaryId] = useState<number | null>(null)
-  const [amount, setAmount] = useState("")
+  const [transactionId, setTransactionId] = useState<number | null>(initialTransactionId ?? null)
+  const [salaryId, setSalaryId] = useState<number | null>(null)
+  const [amount, setAmount] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  const selectedTransaction = useMemo(
-    () => queue.find((transaction) => transaction.id === preferredTransactionId) ?? queue[0] ?? null,
-    [preferredTransactionId, queue],
-  )
-  const recommendedSalaryLog = useMemo(
-    () => getRecommendedSalaryLog(selectedTransaction, availableLogs),
-    [availableLogs, selectedTransaction],
-  )
-  const selectedSalaryLog = useMemo(
-    () =>
-      availableLogs.find((log) => log.id === preferredSalaryId) ??
-      recommendedSalaryLog ??
-      availableLogs[0] ??
-      null,
-    [availableLogs, preferredSalaryId, recommendedSalaryLog],
-  )
-  const recommendedAmount = useMemo(() => {
-    if (!selectedTransaction || !selectedSalaryLog) {
-      return 0
-    }
-
-    return Math.min(getRemainingDebt(selectedTransaction), selectedSalaryLog.amount_unused)
-  }, [selectedSalaryLog, selectedTransaction])
-
-  function applySuggestedAmount() {
-    if (recommendedAmount > 0) {
-      setAmount(String(recommendedAmount))
-      setError(null)
-    }
-  }
-
-  function submitSettlement() {
-    if (!selectedTransaction) {
-      setError("请先选择一笔待核销账单")
-      return
-    }
-    if (!selectedSalaryLog) {
-      setError("请先选择一笔可用回款")
-      return
-    }
-
-    const numericAmount = Number(amount)
-    if (!amount || Number.isNaN(numericAmount) || numericAmount <= 0) {
-      setError("请输入有效的核销金额")
-      return
-    }
-    if (numericAmount > getRemainingDebt(selectedTransaction)) {
-      setError("核销金额不能超过账单剩余欠款")
-      return
-    }
-    if (numericAmount > selectedSalaryLog.amount_unused) {
-      setError("核销金额不能超过回款剩余金额")
-      return
-    }
-
-    setError(null)
+  const [success, setSuccess] = useState<string | null>(null)
+  const [step, setStep] = useState(initialTransactionId ? 2 : 1)
+  const selected =
+    transactionId === null
+      ? (queue[0] ?? null)
+      : (queue.find((t) => t.id === transactionId) ?? null)
+  const recommended = recommendSalary(selected, salary.available)
+  const funds = salary.available.find((l) => l.id === salaryId) ?? recommended
+  const maximum = selected && funds ? Math.min(due(selected), funds.amount_unused) : 0
+  const value = amount ?? (maximum > 0 ? maximum.toFixed(2) : "")
+  const numeric = Number(value)
+  const invalid =
+    moneyError(value) ??
+    (numeric > maximum
+      ? `最多可核销 ${currency.format(maximum)}，当前超出 ${currency.format(numeric - maximum)}`
+      : null)
+  const missingRequested =
+    Boolean(initialTransactionId) &&
+    !transactions.query.isLoading &&
+    !transactions.query.isError &&
+    !selected
+  function submit() {
+    if (!selected || !funds || invalid || salary.settle.isPending) return
+    const billName = selected.title
     salary.settle.mutate(
+      { transaction_id: selected.id, salary_log_id: funds.id, amount: numeric },
       {
-        amount: numericAmount,
-        salary_log_id: selectedSalaryLog.id,
-        transaction_id: selectedTransaction.id,
-      },
-      {
-        onError: (mutationError) => {
-          setError(getApiErrorMessage(mutationError, "核销失败，请稍后重试"))
-        },
         onSuccess: () => {
-          setAmount("")
+          setSuccess(`已为「${billName}」核销 ${currency.format(numeric)}`)
+          setAmount(null)
+          setSalaryId(null)
+          setTransactionId(null)
+          setStep(1)
           setError(null)
         },
+        onError: (e) => setError(getApiErrorMessage(e, "核销失败，请核对记录后重试")),
       },
     )
   }
-
   return (
-    <div className="space-y-5">
-      <section className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-5 shadow-card lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-            Settlement workbench
-          </p>
-          <h2 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-            带着推荐直接核销，不再来回试金额
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
-            左侧先选欠款最多的账单，中间看可用回款和推荐项，右侧直接确认本次核销金额。后续可以继续迭代成更完整的自动推荐策略。
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => pageState.setTxnDialogOpen(true)}>
-            <Plus size={15} />
-            去记录账单
+    <div className="flex flex-col gap-4">
+      <PageHeader title="核销账单" description="将已到账收入关联到账单，不会发起实际转账">
+        <Button variant="outline" size="sm" onClick={() => onNavigate("transactions")}>
+          <ArrowLeft data-icon="inline-start" />
+          账单
+        </Button>
+      </PageHeader>
+      {success && (
+        <Alert>
+          <CheckCircle2 aria-hidden="true" />
+          <AlertTitle>{success}</AlertTitle>
+          <AlertDescription>账单与可用收入已同步更新，可继续处理下一笔。</AlertDescription>
+        </Alert>
+      )}
+      {transactions.query.isError && (
+        <QueryError
+          title="无法获取待处理账单"
+          hasData={Boolean(transactions.query.data)}
+          onRetry={() => {
+            void transactions.query.refetch()
+          }}
+        />
+      )}
+      {salary.availableQuery.isError && (
+        <QueryError
+          title="无法获取可用收入"
+          hasData={Boolean(salary.availableQuery.data)}
+          onRetry={() => {
+            void salary.availableQuery.refetch()
+          }}
+        />
+      )}
+      {missingRequested && (
+        <Alert variant="destructive">
+          <AlertTitle>这笔账单已结清或不存在</AlertTitle>
+          <AlertDescription>请从账单列表重新选择，当前不会自动改为处理其他账单。</AlertDescription>
+        </Alert>
+      )}
+      <nav aria-label="核销步骤" className="grid grid-cols-3 gap-2 lg:hidden">
+        {["选账单", "选收入", "确认金额"].map((label, i) => (
+          <Button
+            key={label}
+            variant={step === i + 1 ? "default" : "outline"}
+            size="sm"
+            disabled={(i > 0 && !selected) || (i > 1 && !funds)}
+            aria-current={step === i + 1 ? "step" : undefined}
+            onClick={() => setStep(i + 1)}
+          >
+            {i + 1}. {label}
           </Button>
-          <Button variant="outline" onClick={() => pageState.setSalaryDialogOpen(true)}>
-            <ArrowDownCircle size={15} />
-            去录入回款
-          </Button>
-          <Button onClick={() => onNavigate("transactions")}>
-            去账单中心
-            <ArrowRight size={15} />
-          </Button>
-        </div>
-      </section>
-
-      <section className="grid gap-4 xl:grid-cols-[0.9fr_0.95fr_1.15fr]">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Queue
-              </p>
-              <h3 className="mt-1 text-lg font-bold tracking-tight text-slate-950">
-                待核销账单
-              </h3>
-            </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
-              {queue.length} 笔
-            </span>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {transactions.query.isLoading && (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                正在加载待核销账单...
-              </div>
+        ))}
+      </nav>
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <Card className={cn(step !== 1 && "hidden lg:block")}>
+          <CardHeader>
+            <CardTitle>待处理账单 · {queue.length} 笔</CardTitle>
+            <CardDescription>按时间先后处理</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!transactions.query.isLoading && !transactions.query.isError && !queue.length && (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>当前没有待处理账单</EmptyTitle>
+                  <EmptyDescription>可记录新账单或查看已结清记录。</EmptyDescription>
+                </EmptyHeader>
+                <Button onClick={() => pageState.setTxnDialogOpen(true)}>
+                  <Plus data-icon="inline-start" />
+                  记录账单
+                </Button>
+              </Empty>
             )}
-
-            {!transactions.query.isLoading && queue.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                当前没有待核销账单，可以先去录入新账单。
+            {transactions.query.isLoading && <p role="status">正在加载账单…</p>}
+            <ScrollArea className="h-[min(55dvh,32rem)]">
+              <div className="flex flex-col gap-2 pr-3">
+                {queue.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    disabled={salary.settle.isPending}
+                    aria-pressed={selected?.id === t.id}
+                    onClick={() => {
+                      setTransactionId(t.id)
+                      setSalaryId(null)
+                      setAmount(null)
+                      setError(null)
+                      setSuccess(null)
+                      setStep(2)
+                    }}
+                    className={cn(
+                      "w-full rounded-lg border p-3 text-left focus-visible:ring-2 focus-visible:ring-ring",
+                      selected?.id === t.id ? "border-primary bg-accent" : "hover:bg-muted",
+                    )}
+                  >
+                    <p className="font-medium">{t.title}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <CategoryBadge category={t.category} />
+                      <StatusBadge status={t.status} />
+                      <span className="ml-auto font-semibold tabular-nums">
+                        {currency.format(due(t))}
+                      </span>
+                    </div>
+                  </button>
+                ))}
               </div>
-            )}
-
-            {queue.map((transaction) => {
-              const remainingDebt = getRemainingDebt(transaction)
-              const isActive = transaction.id === selectedTransaction?.id
-
-              return (
-                <button
-                  key={transaction.id}
-                  type="button"
-                  onClick={() => {
-                    setPreferredTransactionId(transaction.id)
-                    setPreferredSalaryId(null)
-                    setAmount("")
-                    setError(null)
-                  }}
-                  className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-                    isActive
-                      ? "border-slate-950 bg-slate-950 text-white shadow-lg shadow-slate-950/10"
-                      : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className={`truncate text-sm font-semibold ${isActive ? "text-white" : "text-slate-950"}`}>
-                        {transaction.title}
-                      </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <CategoryBadge category={transaction.category} />
-                        <StatusBadge status={transaction.status} />
-                      </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+        <Card className={cn(step !== 2 && "hidden lg:block")}>
+          <CardHeader>
+            <CardTitle>选择到账收入</CardTitle>
+            <CardDescription>
+              {selected ? `账单：${selected.title}` : "请先选择账单"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!salary.availableQuery.isLoading &&
+              !salary.availableQuery.isError &&
+              !salary.available.length && (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>暂无可用收入</EmptyTitle>
+                    <EmptyDescription>先录入工资或报销到账，再关联账单。</EmptyDescription>
+                  </EmptyHeader>
+                  <Button onClick={() => pageState.setSalaryDialogOpen(true)}>录入收入</Button>
+                </Empty>
+              )}
+            {salary.availableQuery.isLoading && <p role="status">正在加载收入…</p>}
+            <ScrollArea className="h-[min(50dvh,32rem)]">
+              <div className="flex flex-col gap-2 pr-3">
+                {salary.available.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    disabled={!selected || salary.settle.isPending}
+                    aria-pressed={funds?.id === l.id}
+                    onClick={() => {
+                      setSalaryId(l.id)
+                      setAmount(null)
+                      setError(null)
+                      setStep(3)
+                    }}
+                    className={cn(
+                      "w-full rounded-lg border p-3 text-left focus-visible:ring-2 focus-visible:ring-ring",
+                      funds?.id === l.id ? "border-primary bg-accent" : "hover:bg-muted",
+                    )}
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="font-medium">
+                        {sourceLabel[l.source]} · {l.month}
+                      </span>
+                      <span className="font-semibold tabular-nums">
+                        {currency.format(l.amount_unused)}
+                      </span>
                     </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-semibold tabular-nums ${isActive ? "text-white" : "text-red-600"}`}>
-                        {currency.format(remainingDebt)}
+                    <p className="mt-1 text-sm text-muted-foreground">{l.remark || "未填写备注"}</p>
+                    {recommended?.id === l.id && (
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        推荐：
+                        {selected?.category === "work" && l.source === "reimbursement"
+                          ? "优先使用报销收入"
+                          : selected?.category === "personal" && l.source === "salary"
+                            ? "优先使用工资收入"
+                            : "按可用余额匹配"}
+                        ，
+                        {selected && l.amount_unused >= due(selected)
+                          ? "可全额结清"
+                          : "可先部分核销"}
                       </p>
-                      <p className={`mt-1 text-xs ${isActive ? "text-slate-300" : "text-slate-400"}`}>
-                        剩余欠款
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Funds
-              </p>
-              <h3 className="mt-1 text-lg font-bold tracking-tight text-slate-950">
-                可用回款池
-              </h3>
-            </div>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-500">
-              {availableLogs.length} 笔
-            </span>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {salary.availableQuery.isLoading && (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                正在加载可用回款...
+                    )}
+                  </button>
+                ))}
               </div>
+            </ScrollArea>
+            {selected && funds && (
+              <Button className="mt-3 w-full lg:hidden" onClick={() => setStep(3)}>
+                使用所选收入
+                <ArrowRight data-icon="inline-end" />
+              </Button>
             )}
-
-            {!salary.availableQuery.isLoading && availableLogs.length === 0 && (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                当前没有可用回款，先录入一笔回款再来核销。
-              </div>
-            )}
-
-            {availableLogs.map((log) => {
-              const isActive = log.id === selectedSalaryLog?.id
-              const isRecommended = log.id === recommendedSalaryLog?.id
-
-              return (
-                <button
-                  key={log.id}
-                  type="button"
-                  onClick={() => {
-                    setPreferredSalaryId(log.id)
-                    setAmount("")
-                    setError(null)
-                  }}
-                  className={`w-full rounded-2xl border px-4 py-4 text-left transition ${
-                    isActive
-                      ? "border-blue-600 bg-blue-600 text-white shadow-lg shadow-blue-600/10"
-                      : "border-slate-100 bg-white hover:border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className={`text-sm font-semibold ${isActive ? "text-white" : "text-slate-950"}`}>
-                          {log.month}
-                        </p>
-                        {isRecommended && (
-                          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            isActive ? "bg-white/10 text-white" : "bg-blue-50 text-blue-700"
-                          }`}>
-                            推荐
-                          </span>
-                        )}
-                      </div>
-                      <p className={`mt-2 text-xs ${isActive ? "text-blue-100" : "text-slate-400"}`}>
-                        {log.source} · {log.remark || "未填写备注"}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-sm font-semibold tabular-nums ${isActive ? "text-white" : "text-emerald-600"}`}>
-                        {currency.format(log.amount_unused)}
-                      </p>
-                      <p className={`mt-1 text-xs ${isActive ? "text-blue-100" : "text-slate-400"}`}>
-                        可用余额
-                      </p>
-                    </div>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Preview
-              </p>
-              <h3 className="mt-1 text-lg font-bold tracking-tight text-slate-950">
-                本次核销预览
-              </h3>
-            </div>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-950 px-3 py-1 text-xs font-medium text-white">
-              <Sparkles size={12} />
-              推荐驱动
-            </span>
-          </div>
-
-          <div className="mt-5 space-y-4">
-            <div className="rounded-2xl bg-slate-50 px-4 py-4">
-              <p className="text-xs font-medium text-slate-500">当前账单</p>
-              <p className="mt-2 text-sm font-semibold text-slate-950">
-                {selectedTransaction?.title ?? "未选择账单"}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                剩余欠款：{currency.format(selectedTransaction ? getRemainingDebt(selectedTransaction) : 0)}
-              </p>
-            </div>
-
-            <div className="rounded-2xl bg-slate-50 px-4 py-4">
-              <p className="text-xs font-medium text-slate-500">当前回款</p>
-              <p className="mt-2 text-sm font-semibold text-slate-950">
-                {selectedSalaryLog ? `${selectedSalaryLog.month} · ${selectedSalaryLog.source}` : "未选择回款"}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                可用余额：{currency.format(selectedSalaryLog?.amount_unused ?? 0)}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-4">
-              <p className="text-xs font-medium text-blue-600">建议金额</p>
-              <p className="mt-2 text-2xl font-bold tracking-tight text-blue-900">
-                {currency.format(recommendedAmount)}
-              </p>
-              <p className="mt-2 text-sm text-blue-700">
-                这是当前账单与当前回款的安全交集金额，可直接填入。
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-slate-500">本次核销金额</label>
+          </CardContent>
+        </Card>
+        <Card className={cn("lg:sticky lg:top-4", step !== 3 && "hidden lg:block")}>
+          <CardHeader>
+            <CardTitle>确认本次核销</CardTitle>
+            <CardDescription>核对账单、来源和剩余金额</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-sm">
+              <dt className="text-muted-foreground">账单</dt>
+              <dd className="text-right font-medium">{selected?.title ?? "尚未选择"}</dd>
+              <dt className="text-muted-foreground">未结金额</dt>
+              <dd className="text-right tabular-nums">
+                {selected ? currency.format(due(selected)) : "—"}
+              </dd>
+              <dt className="text-muted-foreground">到账收入</dt>
+              <dd className="text-right">
+                {funds ? `${sourceLabel[funds.source]} · ${funds.month}` : "尚未选择"}
+              </dd>
+              <dt className="text-muted-foreground">可用金额</dt>
+              <dd className="text-right tabular-nums">
+                {funds ? currency.format(funds.amount_unused) : "—"}
+              </dd>
+            </dl>
+            <Field data-invalid={Boolean(amount !== null && invalid)}>
+              <FieldLabel htmlFor="settle-amount">本次核销金额（人民币）</FieldLabel>
               <Input
+                id="settle-amount"
                 type="number"
-                min="0"
+                inputMode="decimal"
+                min="0.01"
                 step="0.01"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                placeholder="输入本次要核销的金额"
+                max={maximum}
+                value={value}
+                disabled={!selected || !funds || salary.settle.isPending}
+                onChange={(e) => setAmount(e.target.value)}
+                aria-invalid={Boolean(amount !== null && invalid)}
+                aria-describedby={
+                  invalid && amount !== null
+                    ? "settle-amount-help settle-amount-error"
+                    : "settle-amount-help"
+                }
+                placeholder="输入核销金额"
               />
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={applySuggestedAmount} disabled={recommendedAmount <= 0}>
-                按建议金额填入
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  if (selectedTransaction) {
-                    setAmount(String(getRemainingDebt(selectedTransaction)))
-                    setError(null)
-                  }
-                }}
-                disabled={!selectedTransaction}
-              >
-                全额核销当前账单
-              </Button>
-            </div>
-
-            {error && <ErrorBox msg={error} />}
-
-            <div className="rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 text-sm text-slate-500">
-              <p>核销后账单剩余：{currency.format(Math.max(0, (selectedTransaction ? getRemainingDebt(selectedTransaction) : 0) - (Number(amount) || 0)))}</p>
-              <p className="mt-2">核销后回款剩余：{currency.format(Math.max(0, (selectedSalaryLog?.amount_unused ?? 0) - (Number(amount) || 0)))}</p>
-            </div>
-
-            <Button className="w-full" onClick={submitSettlement} disabled={salary.settle.isPending}>
-              {salary.settle.isPending ? "提交中..." : "确认本次核销"}
+              <FieldDescription id="settle-amount-help">
+                {selected && funds ? `本次最多 ${currency.format(maximum)}` : "选择账单与收入后显示限额"}
+              </FieldDescription>
+              {amount !== null && invalid && (
+                <FieldError id="settle-amount-error">{invalid}</FieldError>
+              )}
+            </Field>
+            <Button
+              variant="outline"
+              disabled={maximum <= 0 || salary.settle.isPending}
+              onClick={() => setAmount(maximum.toFixed(2))}
+            >
+              {selected && funds && funds.amount_unused < due(selected)
+                ? "使用这笔收入的全部余额"
+                : "全额结清当前账单"}
             </Button>
-          </div>
-        </div>
-      </section>
-
+            {!invalid && selected && funds && (
+              <div className="rounded-lg bg-muted p-3 text-sm">
+                <p>核销后账单剩余：{currency.format(due(selected) - numeric)}</p>
+                <p className="mt-2">
+                  核销后收入剩余：
+                  {currency.format(funds.amount_unused - numeric)}
+                </p>
+              </div>
+            )}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+            <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom)+0.75rem)] z-20 rounded-md bg-card p-1 lg:static lg:p-0">
+              <Button
+                className="w-full"
+                onClick={submit}
+                disabled={
+                  Boolean(invalid) ||
+                  !selected ||
+                  !funds ||
+                  salary.settle.isPending ||
+                  transactions.query.isError ||
+                  salary.availableQuery.isError
+                }
+              >
+                {salary.settle.isPending ? "核销中…" : "确认本次核销"}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
       <SettlementDialogs pageState={pageState} salary={salary} transactions={transactions} />
     </div>
   )

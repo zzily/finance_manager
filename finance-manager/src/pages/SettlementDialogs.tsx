@@ -1,3 +1,5 @@
+import { useExpenseCategories } from "../hooks/useExpenseCategories"
+import { useBackendCapabilities } from "../hooks/useBackendCapabilities"
 import { DeleteConfirmDialog } from "../components/dialogs/DeleteConfirmDialog"
 import { EditSalaryLogDialog } from "../components/dialogs/EditSalaryLogDialog"
 import { EditTransactionDialog } from "../components/dialogs/EditTransactionDialog"
@@ -9,19 +11,24 @@ import { TransactionDialog } from "../components/dialogs/TransactionDialog"
 import type { SalaryLogsState } from "../hooks/useSalaryLogs"
 import type { TransactionsState } from "../hooks/useTransactions"
 
+import type { BillTemplate } from "../lib/templates"
 import type { SettlementPageState } from "./useSettlementPageState"
 
 type SettlementDialogsProps = {
+  initialTemplate?: BillTemplate
   pageState: SettlementPageState
   salary: SalaryLogsState
   transactions: TransactionsState
 }
 
 export function SettlementDialogs({
+  initialTemplate,
   pageState,
   salary,
   transactions,
 }: SettlementDialogsProps) {
+  const { capabilities } = useBackendCapabilities()
+  const categories = useExpenseCategories(capabilities.expenseCategories)
   return (
     <>
       <SettleDialog
@@ -35,17 +42,32 @@ export function SettlementDialogs({
         onSubmit={(salaryLogId, amount) => {
           if (!pageState.selectedTxn) return
           salary.settle.mutate(
-            { transaction_id: pageState.selectedTxn.id, salary_log_id: salaryLogId, amount },
+            {
+              transaction_id: pageState.selectedTxn.id,
+              salary_log_id: salaryLogId,
+              amount,
+            },
             { onSuccess: () => pageState.setSettleOpen(false) },
           )
         }}
       />
       <TransactionDialog
+        supportsOccurrenceDate={capabilities.transactionOccurrenceDate}
+        supportsCategories={capabilities.expenseCategories}
+        categories={categories.categories}
+        categoriesError={categories.query.isError}
+        supportsImmediatePayment={capabilities.immediatePayment}
+        availableLogs={salary.available}
+        incomeError={salary.availableQuery.isError}
+        incomeLoading={salary.availableQuery.isLoading}
+        initialTemplate={initialTemplate}
         open={pageState.txnDialogOpen}
         onOpenChange={pageState.setTxnDialogOpen}
         isPending={transactions.create.isPending}
         onSubmit={(form) => {
-          transactions.create.mutate(form, { onSuccess: () => pageState.setTxnDialogOpen(false) })
+          transactions.create.mutate(form, {
+            onSuccess: () => pageState.setTxnDialogOpen(false),
+          })
         }}
       />
       <SalaryLogDialog
@@ -53,16 +75,24 @@ export function SettlementDialogs({
         onOpenChange={pageState.setSalaryDialogOpen}
         isPending={salary.create.isPending}
         onSubmit={(form) => {
-          salary.create.mutate(form, { onSuccess: () => pageState.setSalaryDialogOpen(false) })
+          salary.create.mutate(form, {
+            onSuccess: () => pageState.setSalaryDialogOpen(false),
+          })
         }}
       />
       <EditTransactionDialog
+        supportsOccurrenceDate={capabilities.transactionOccurrenceDate}
         open={pageState.editOpen}
         onOpenChange={pageState.setEditOpen}
+        supportsCategories={capabilities.expenseCategories}
+        categories={categories.categories}
         transaction={pageState.editingTxn}
         isPending={transactions.update.isPending}
         onSubmit={(id, payload) => {
-          transactions.update.mutate({ id, payload }, { onSuccess: () => pageState.setEditOpen(false) })
+          transactions.update.mutate(
+            { id, payload },
+            { onSuccess: () => pageState.setEditOpen(false) },
+          )
         }}
       />
       <DeleteConfirmDialog
@@ -97,7 +127,10 @@ export function SettlementDialogs({
         salaryLog={pageState.editingSalaryLog}
         isPending={salary.update.isPending}
         onSubmit={(id, payload) => {
-          salary.update.mutate({ id, payload }, { onSuccess: () => pageState.setEditSalaryOpen(false) })
+          salary.update.mutate(
+            { id, payload },
+            { onSuccess: () => pageState.setEditSalaryOpen(false) },
+          )
         }}
       />
       <SettlementHistoryDialog

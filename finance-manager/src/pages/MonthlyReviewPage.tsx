@@ -1,238 +1,214 @@
 import { useMemo, useState } from "react"
-
-import { ArrowRight, CalendarDays, ChevronDown, Sparkles, TrendingUp, Wallet } from "lucide-react"
-
-import { BusinessLoopCard } from "../components/dashboard/BusinessLoopCard"
+import { ArrowRight } from "lucide-react"
 import { CategoryPieChart, MonthlyTrendChart } from "../components/dashboard/Charts"
-import { FamilyLoopCard } from "../components/dashboard/FamilyLoopCard"
-import { BalanceCard, TotalAssetsCard } from "../components/dashboard/MetricCards"
+import { PageHeader } from "../components/common/PageHeader"
+import { QueryError, DataUpdated } from "../components/common/QueryState"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../components/ui/card"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "../components/ui/empty"
 import { Button } from "../components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu"
-import { MonthPicker } from "../components/ui/month-picker"
+import { Input } from "../components/ui/input"
+import { Skeleton } from "../components/ui/skeleton"
+import { Field, FieldLabel } from "../components/ui/field"
 import { useSalaryLogs } from "../hooks/useSalaryLogs"
 import { useSummary } from "../hooks/useSummary"
 import { useTransactions } from "../hooks/useTransactions"
-import type { AppView } from "../layouts/appShell.types"
+import { todayKey } from "../lib/formHelpers"
+import { transactionDate, type AppNavigate } from "../lib/navigation"
 import { currency } from "../lib/formatters"
-import { getReviewMonthVisibility } from "./monthlyReviewMonths"
-
-function getCurrentMonthKey() {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, "0")
-  return `${now.getFullYear()}-${month}`
-}
-
-function formatMonthLabel(month: string) {
-  const [year, monthNumber] = month.split("-")
-  return `${year} 年 ${Number(monthNumber)} 月`
-}
-
-export function MonthlyReviewPage({
-  onNavigate,
-}: {
-  onNavigate: (view: AppView) => void
-}) {
-  const transactions = useTransactions()
-  const salary = useSalaryLogs()
-  const [preferredMonth, setPreferredMonth] = useState("")
-
-  const availableMonths = useMemo(
+import { cn } from "../lib/utils"
+export function MonthlyReviewPage({ onNavigate }: { onNavigate: AppNavigate }) {
+  const transactions = useTransactions(),
+    salary = useSalaryLogs()
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    try {
+      return sessionStorage.getItem("finance-review-month") || todayKey().slice(0, 7)
+    } catch {
+      return todayKey().slice(0, 7)
+    }
+  })
+  const months = useMemo(
     () =>
       Array.from(
         new Set([
-          ...transactions.all.map((transaction) => transaction.created_at.slice(0, 7)),
-          ...salary.allLogs.map((log) => log.month),
+          ...transactions.all.map((t) => transactionDate(t).slice(0, 7)),
+          ...salary.allLogs.map((l) => l.month),
         ]),
       )
-        .filter(Boolean)
-        .sort((left, right) => right.localeCompare(left)),
-    [salary.allLogs, transactions.all],
+        .sort()
+        .reverse(),
+    [transactions.all, salary.allLogs],
   )
-  const selectedMonth = useMemo(() => {
-    if (preferredMonth) {
-      return preferredMonth
+  const summary = useSummary(selectedMonth),
+    trend = useSummary()
+  const [year, month] = selectedMonth.split("-")
+  const hasRows =
+    transactions.all.some((t) => transactionDate(t).startsWith(selectedMonth)) ||
+    salary.allLogs.some((l) => l.month === selectedMonth)
+  function select(value: string) {
+    if (!value) return
+    setSelectedMonth(value)
+    try {
+      sessionStorage.setItem("finance-review-month", value)
+    } catch {
+      /* Current month still works. */
     }
-    return availableMonths[0] ?? getCurrentMonthKey()
-  }, [availableMonths, preferredMonth])
-  const monthVisibility = useMemo(
-    () => getReviewMonthVisibility(availableMonths, selectedMonth),
-    [availableMonths, selectedMonth],
-  )
-
-  const summary = useSummary(selectedMonth)
-  const categoryBreakdown = summary.chartData?.category_breakdown ?? []
-  const topCategory = [...categoryBreakdown].sort((left, right) => right.value - left.value)[0]
-  const businessCoverage =
-    summary.businessLoop?.total_lent && summary.businessLoop.total_lent > 0
-      ? (summary.businessLoop.total_reimbursed / summary.businessLoop.total_lent) * 100
-      : 0
-
+  }
   return (
-    <div className="space-y-5">
-      <section className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white px-5 py-5 shadow-card lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-            Review
-          </p>
-          <h2 className="mt-1 text-3xl font-bold tracking-tight text-slate-950">
-            用复盘视角看账本，而不只是看余额
-          </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-500">
-            复盘页现在已经支持按月份查看 summary 结果。你可以切换月份观察当期回款覆盖率、净结余和支出重点，再决定是否回到账单中心追查明细。
-          </p>
-        </div>
-        <div className="flex flex-col gap-3 sm:min-w-[280px]">
-          <MonthPicker
+    <div className="flex flex-col gap-5">
+      <PageHeader title="月度复盘" description={`${year} 年 ${Number(month)} 月 · 人民币`}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onNavigate("transactions", { month: selectedMonth, status: "all" })}
+        >
+          查看本月账单
+          <ArrowRight data-icon="inline-end" />
+        </Button>
+      </PageHeader>
+      <div className="flex flex-wrap items-end gap-3">
+        <Field className="w-44">
+          <FieldLabel htmlFor="review-month">复盘月份</FieldLabel>
+          <Input
+            id="review-month"
+            type="month"
             value={selectedMonth}
-            onChange={(value) => setPreferredMonth(value)}
-            placeholder="选择要复盘的月份"
+            onChange={(e) => select(e.target.value)}
           />
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setPreferredMonth("")}>
-              使用最新月份
+        </Field>
+        <Button variant="ghost" size="sm" onClick={() => select(todayKey().slice(0, 7))}>
+          本月
+        </Button>
+        {months
+          .filter((m) => m !== selectedMonth)
+          .slice(0, 3)
+          .map((m) => (
+            <Button key={m} variant="outline" size="sm" onClick={() => select(m)}>
+              {m}
             </Button>
-            <Button onClick={() => onNavigate("transactions")}>
-              去账单中心细看明细
-              <ArrowRight size={15} />
-            </Button>
-          </div>
+          ))}
+      </div>
+      {summary.isError && (
+        <QueryError
+          title="无法刷新月度汇总"
+          hasData={summary.hasData}
+          onRetry={() => {
+            void summary.query.refetch()
+          }}
+          isFetching={summary.query.isFetching}
+        />
+      )}
+      {summary.isLoading && (
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map((n) => (
+            <Skeleton key={n} className="h-28 w-full" />
+          ))}
         </div>
-      </section>
-
-      <section className="flex flex-col gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-card lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-            Selected month
-          </p>
-          <h3 className="mt-1 text-xl font-bold tracking-tight text-slate-950">
-            {formatMonthLabel(selectedMonth)}
-          </h3>
-          <p className="mt-1 text-sm text-slate-500">
-            当前卡片和图表都按这个月份过滤，方便做单月复盘。
-          </p>
-        </div>
-        <div className="rounded-2xl bg-slate-50 px-4 py-3">
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <CalendarDays size={16} className="text-slate-400" />
-            <span>有数据月份 {monthVisibility.totalDataMonths} 个</span>
+      )}
+      {summary.hasData && (
+        <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              {
+                label: "工资收入",
+                value: summary.familyLoop?.gross_income ?? 0,
+                hint: "归属本月的工资到账",
+                tone: "text-income",
+              },
+              {
+                label: "个人支出",
+                value: summary.personalSpending,
+                hint: "本月个人消费",
+                tone: "text-expense",
+              },
+              {
+                label: "净结余",
+                value: summary.netSavings,
+                hint: "工资收入 − 个人支出",
+                tone: summary.netSavings >= 0 ? "text-income" : "text-expense",
+              },
+              {
+                label: "工作账单未结",
+                value: summary.businessDebt,
+                hint: "本月工作账单当前未关联金额",
+                tone: "text-foreground",
+              },
+            ].map((m) => (
+              <Card key={m.label}>
+                <CardHeader>
+                  <CardTitle>{m.label}</CardTitle>
+                  <CardDescription>{m.hint}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p className={cn("text-xl font-semibold tabular-nums", m.tone)}>
+                    {currency.format(m.value)}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {monthVisibility.quickMonths.map((month) => {
-              const isActive = month === selectedMonth
-
-              return (
-                <button
-                  key={month}
-                  type="button"
-                  onClick={() => setPreferredMonth(month)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                    isActive
-                      ? "border-slate-950 bg-slate-950 text-white"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900"
-                  }`}
-                >
-                  {formatMonthLabel(month)}
-                </button>
-              )
-            })}
-            {monthVisibility.overflowMonths.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-full px-3 text-xs font-medium text-slate-600"
-                  >
-                    更多月份
-                    <ChevronDown size={14} />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="max-h-72 w-44 overflow-y-auto">
-                  {monthVisibility.overflowMonths.map((month) => (
-                    <DropdownMenuItem
-                      key={month}
-                      onSelect={() => setPreferredMonth(month)}
-                      className={month === selectedMonth ? "bg-slate-100 font-semibold text-slate-900" : undefined}
-                    >
-                      {formatMonthLabel(month)}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
+          <DataUpdated timestamp={summary.query.dataUpdatedAt} />
+          {!transactions.query.isLoading &&
+            !salary.allQuery.isLoading &&
+            !transactions.query.isError &&
+            !salary.allQuery.isError &&
+            !hasRows && (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>这个月还没有记录</EmptyTitle>
+                  <EmptyDescription>可切换其他月份查看，或开始记录账单。</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             )}
+          <Card>
+            <CardHeader>
+              <CardTitle>本月收支</CardTitle>
+              <CardDescription>
+                工资 {currency.format(summary.familyLoop?.gross_income ?? 0)}
+                ，个人支出 {currency.format(summary.personalSpending)}
+                。工作垫付与报销单独统计。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                onClick={() =>
+                  onNavigate("transactions", {
+                    month: selectedMonth,
+                    category: "personal",
+                    status: "all",
+                  })
+                }
+              >
+                查看个人支出明细
+              </Button>
+            </CardContent>
+          </Card>
+          <div className="grid items-start gap-4 lg:grid-cols-2">
+            {trend.isError ? (
+              <QueryError
+                title="无法刷新收支趋势"
+                hasData={trend.hasData}
+                onRetry={() => {
+                  void trend.query.refetch()
+                }}
+              />
+            ) : (
+              <MonthlyTrendChart
+                data={
+                  trend.chartData
+                    ? {
+                        ...trend.chartData,
+                        monthly_timeline: trend.chartData.monthly_timeline.slice(-6),
+                      }
+                    : null
+                }
+                isLoading={trend.isLoading}
+              />
+            )}
+            <CategoryPieChart data={summary.chartData} isLoading={summary.isLoading} />
           </div>
-        </div>
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <BalanceCard isLoading={summary.isLoading} balance={summary.availableBalance} onClick={() => {}} />
-        <TotalAssetsCard isLoading={summary.isLoading} totalAssets={summary.totalAssets} />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-50 text-blue-600">
-            <Sparkles size={18} />
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-slate-950">回款覆盖率</h3>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-            {businessCoverage.toFixed(0)}%
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            已回款 {currency.format(summary.businessLoop?.total_reimbursed ?? 0)}，对应垫付总额 {currency.format(summary.businessLoop?.total_lent ?? 0)}。
-          </p>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-            <TrendingUp size={18} />
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-slate-950">净结余状态</h3>
-          <p className={`mt-2 text-3xl font-bold tracking-tight ${summary.netSavings >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-            {currency.format(summary.netSavings)}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            家庭储蓄表现 {summary.netSavings >= 0 ? "保持在正区间" : "已经跌入负区间"}，适合结合个人支出与收入走势一起看。
-          </p>
-        </div>
-
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
-          <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-            <Wallet size={18} />
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-slate-950">当前支出重点</h3>
-          <p className="mt-2 text-3xl font-bold tracking-tight text-slate-950">
-            {topCategory?.name ?? "暂无"}
-          </p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            当前最大支出分类为 {topCategory?.name ?? "暂无"}，累计 {currency.format(topCategory?.value ?? 0)}。
-          </p>
-        </div>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <BusinessLoopCard
-          isLoading={summary.isLoading}
-          loop={summary.businessLoop}
-          debt={summary.businessDebt}
-        />
-        <FamilyLoopCard
-          isLoading={summary.isLoading}
-          loop={summary.familyLoop}
-          netSavings={summary.netSavings}
-          personalSpending={summary.personalSpending}
-        />
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <MonthlyTrendChart data={summary.chartData} isLoading={summary.isLoading} />
-        <CategoryPieChart data={summary.chartData} isLoading={summary.isLoading} />
-      </div>
+        </>
+      )}
     </div>
   )
 }

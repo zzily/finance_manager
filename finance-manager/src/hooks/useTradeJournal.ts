@@ -1,24 +1,25 @@
+import { fetchAllPages } from "../lib/pagination"
+import { useApiEndpoint } from "./useApiEndpoint"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
 
-import { api, getApiErrorMessage, unwrapResponseData } from "../lib/api"
+import {
+  api,
+  type ApiEndpointKey,
+  getApiErrorMessage,
+  unwrapResponseData,
+} from "../lib/api"
 import type { ApiResponse, IdPayload, TradeRecord, TradeRecordInput } from "../types"
 
-async function fetchTradeRecords() {
-  return unwrapResponseData(api.get<ApiResponse<TradeRecord[]>>("/trade_records/"))
+async function fetchTradeRecords(endpoint: ApiEndpointKey) {
+  return fetchAllPages<TradeRecord>("/trade_records/",endpoint)
 }
 
 async function createTradeRecordApi(payload: TradeRecordInput) {
   return unwrapResponseData(api.post<ApiResponse<IdPayload>>("/trade_records/", payload))
 }
 
-async function updateTradeRecordApi({
-  id,
-  payload,
-}: {
-  id: number
-  payload: TradeRecordInput
-}) {
+async function updateTradeRecordApi({ id, payload }: { id: number; payload: TradeRecordInput }) {
   return unwrapResponseData(api.put<ApiResponse<TradeRecord>>(`/trade_records/${id}`, payload))
 }
 
@@ -27,11 +28,12 @@ async function deleteTradeRecordApi(id: number) {
 }
 
 export function useTradeJournal() {
+  const endpoint = useApiEndpoint()
   const queryClient = useQueryClient()
 
   const query = useQuery({
-    queryKey: ["trade_records"],
-    queryFn: fetchTradeRecords,
+    queryKey: ["trade_records", endpoint],
+    queryFn: () => fetchTradeRecords(endpoint),
   })
 
   const invalidateAll = () => queryClient.invalidateQueries({ queryKey: ["trade_records"] })
@@ -43,7 +45,9 @@ export function useTradeJournal() {
       toast.success("交易记录已保存", { description: "统计数据已经刷新" })
     },
     onError: (error) => {
-      toast.error("新增交易记录失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("新增交易记录失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 
@@ -54,7 +58,9 @@ export function useTradeJournal() {
       toast.success("交易记录已更新", { description: "最新统计已经同步" })
     },
     onError: (error) => {
-      toast.error("更新交易记录失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("更新交易记录失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 
@@ -65,7 +71,9 @@ export function useTradeJournal() {
       toast.success("交易记录已删除")
     },
     onError: (error) => {
-      toast.error("删除交易记录失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("删除交易记录失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 

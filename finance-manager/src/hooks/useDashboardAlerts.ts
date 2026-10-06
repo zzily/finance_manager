@@ -1,3 +1,4 @@
+import { transactionDate } from "../lib/navigation"
 import { useMemo } from "react"
 
 import type { DashboardAlert } from "../components/dashboard/DashboardAlertsSection"
@@ -32,7 +33,7 @@ export function useDashboardAlerts({
       0,
     )
     const agedTransactions = unsettledTransactions.filter(
-      (transaction) => getAgeDays(transaction.created_at) >= 14,
+      (transaction) => getAgeDays(transactionDate(transaction)) >= 14,
     )
 
     if (unsettledTransactions.length > 0) {
@@ -43,6 +44,7 @@ export function useDashboardAlerts({
         tone: "warning",
         actionLabel: "去账单中心",
         view: "transactions",
+        params: { status: "open" },
       })
     }
 
@@ -65,6 +67,7 @@ export function useDashboardAlerts({
         tone: "warning",
         actionLabel: "查看待处理账单",
         view: "transactions",
+        params: { status: "open", minAge: 14, sort: "oldest" },
       })
     }
 

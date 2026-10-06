@@ -13,7 +13,15 @@ describe("useSummary", () => {
         message: "ok",
         data: {
           chart_data: {
-            monthly_timeline: [{ month: "2026-03", income_salary: 200, income_reimbursement: 30, spending_work: 100, spending_personal: 20 }],
+            monthly_timeline: [
+              {
+                month: "2026-03",
+                income_salary: 200,
+                income_reimbursement: 30,
+                spending_work: 100,
+                spending_personal: 20,
+              },
+            ],
             category_breakdown: [{ name: "工作垫付", value: 100 }],
           },
           financial_status: {
@@ -50,7 +58,10 @@ describe("useSummary", () => {
       expect(result.current.totalAssets).toBe(350)
     })
 
-    expect(getSpy).toHaveBeenCalledWith("/summary", { params: { month: "2026-03" } })
+    expect(getSpy).toHaveBeenCalledWith("/summary", {
+      baseURL: "https://fastapi-0tu0.onrender.com",
+      params: { month: "2026-03" },
+    })
     expect(result.current.availableBalance).toBe(230)
     expect(result.current.businessDebt).toBe(70)
     expect(result.current.netSavings).toBe(180)

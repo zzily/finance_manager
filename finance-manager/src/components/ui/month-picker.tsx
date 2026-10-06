@@ -18,11 +18,13 @@ const QUARTER_LABELS = ["Q1", "Q2", "Q3", "Q4"]
  */
 export function MonthPicker({
   value,
+  id,
   onChange,
   placeholder = "选择月份",
   className,
 }: {
   value: string
+  id?: string
   onChange: (value: string) => void
   placeholder?: string
   className?: string
@@ -35,9 +37,7 @@ export function MonthPicker({
     ? [parseInt(value.split("-")[0]), parseInt(value.split("-")[1]) - 1]
     : [NaN, NaN]
 
-  const [viewYear, setViewYear] = useState(
-    !isNaN(selectedYear) ? selectedYear : currentYear,
-  )
+  const [viewYear, setViewYear] = useState(!isNaN(selectedYear) ? selectedYear : currentYear)
   const [isOpen, setIsOpen] = useState(false)
   const [isYearEditing, setIsYearEditing] = useState(false)
   const [yearInput, setYearInput] = useState("")
@@ -104,8 +104,9 @@ export function MonthPicker({
 
   const handleThisMonth = useCallback(() => {
     setViewYear(currentYear)
-    handleSelect(currentMonth)
-  }, [currentYear, currentMonth, handleSelect])
+    onChange(`${currentYear}-${String(currentMonth + 1).padStart(2, "0")}`)
+    close()
+  }, [currentYear, currentMonth, onChange, close])
 
   const handleClear = useCallback(() => {
     onChange("")
@@ -130,23 +131,43 @@ export function MonthPicker({
     <div ref={containerRef} className={cn("relative", className)}>
       {/* ─── Trigger ─── */}
       <button
+        id={id}
+        aria-expanded={isOpen}
+        aria-label={placeholder}
         type="button"
         onClick={() => (isOpen ? close() : open())}
         className={cn(
-          "flex h-10 w-full items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm transition-colors",
-          "hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2",
-          isOpen && "border-slate-400 ring-2 ring-slate-400 ring-offset-2",
+          "flex h-10 w-full items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors",
+          "hover:border-input focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+          isOpen && "border-slate-400 ring-2 ring-ring ring-offset-2",
         )}
       >
-        <Calendar size={14} className="shrink-0 text-slate-400" />
-        <span className={cn("flex-1 text-left", displayText ? "text-slate-900" : "text-slate-400")}>
+        <Calendar size={14} className="shrink-0 text-muted-foreground" />
+        <span
+          className={cn(
+            "flex-1 text-left",
+            displayText ? "text-foreground" : "text-muted-foreground",
+          )}
+        >
           {displayText ?? placeholder}
         </span>
         {displayText && (
           <span
             role="button"
-            onClick={(e) => { e.stopPropagation(); handleClear() }}
-            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-slate-500"
+            aria-label="清除月份"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                e.stopPropagation()
+                handleClear()
+              }
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              handleClear()
+            }}
+            className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-slate-300 transition hover:bg-muted hover:text-muted-foreground"
           >
             <X size={12} />
           </span>
@@ -157,7 +178,7 @@ export function MonthPicker({
       {isOpen && (
         <div
           className={cn(
-            "absolute left-0 z-[60] w-full min-w-[280px] overflow-hidden rounded-xl border border-slate-200 bg-white p-3 shadow-xl",
+            "absolute left-0 z-[60] w-full min-w-[280px] overflow-hidden rounded-xl border border-input bg-background p-3 shadow-xl",
             "animate-in fade-in-0 zoom-in-95 duration-150",
             openUpward
               ? "bottom-full mb-1 slide-in-from-bottom-1"
@@ -168,8 +189,9 @@ export function MonthPicker({
           <div className="mb-3 flex items-center justify-between">
             <button
               type="button"
+              aria-label="上一年"
               onClick={() => setViewYear((y) => y - 1)}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground active:scale-95"
             >
               <ChevronLeft size={16} />
             </button>
@@ -183,14 +205,16 @@ export function MonthPicker({
                 value={yearInput}
                 onChange={(e) => setYearInput(e.target.value)}
                 onBlur={commitYearEdit}
-                onKeyDown={(e) => { if (e.key === "Enter") commitYearEdit() }}
-                className="w-20 rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-center text-sm font-semibold text-slate-900 outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-400"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") commitYearEdit()
+                }}
+                className="w-20 rounded-md border border-input bg-muted px-2 py-1 text-center text-sm font-semibold text-foreground outline-none focus:border-slate-500 focus:ring-1 focus:ring-ring"
               />
             ) : (
               <button
                 type="button"
                 onClick={startYearEdit}
-                className="rounded-md px-3 py-1 text-sm font-bold text-slate-900 transition hover:bg-slate-100"
+                className="rounded-md px-3 py-1 text-sm font-bold text-foreground transition hover:bg-muted"
                 title="点击快速跳转年份"
               >
                 {viewYear}年
@@ -199,13 +223,14 @@ export function MonthPicker({
 
             <button
               type="button"
+              aria-label="下一年"
               onClick={() => setViewYear((y) => y + 1)}
               disabled={viewYear >= currentYear}
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-lg transition active:scale-95",
                 viewYear >= currentYear
                   ? "cursor-not-allowed text-slate-200"
-                  : "text-slate-400 hover:bg-slate-100 hover:text-slate-700",
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
               )}
             >
               <ChevronRight size={16} />
@@ -224,7 +249,9 @@ export function MonthPicker({
                     const monthIdx = qi * 3 + mi
                     const isSelected = viewYear === selectedYear && monthIdx === selectedMonth
                     const isCurrent = viewYear === currentYear && monthIdx === currentMonth
-                    const isFuture = viewYear > currentYear || (viewYear === currentYear && monthIdx > currentMonth)
+                    const isFuture =
+                      viewYear > currentYear ||
+                      (viewYear === currentYear && monthIdx > currentMonth)
                     return (
                       <button
                         key={monthIdx}
@@ -234,12 +261,12 @@ export function MonthPicker({
                         className={cn(
                           "relative rounded-lg py-2.5 text-sm font-medium transition-all duration-150",
                           isSelected
-                            ? "bg-slate-900 text-white shadow-sm"
+                            ? "bg-primary text-white shadow-sm"
                             : isCurrent
                               ? "bg-blue-50 font-semibold text-blue-700 ring-1 ring-blue-200 hover:bg-blue-100"
                               : isFuture
                                 ? "cursor-not-allowed text-slate-200"
-                                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 active:scale-[0.97]",
+                                : "text-muted-foreground hover:bg-muted hover:text-foreground active:scale-[0.97]",
                         )}
                       >
                         {label}
@@ -255,11 +282,11 @@ export function MonthPicker({
           </div>
 
           {/* Footer */}
-          <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2.5">
+          <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
             <button
               type="button"
               onClick={handleClear}
-              className="rounded-md px-2 py-1 text-xs font-medium text-slate-400 transition hover:bg-slate-50 hover:text-slate-600"
+              className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-muted-foreground"
             >
               清除
             </button>

@@ -1,146 +1,230 @@
-import { useEffect, useState, useRef } from "react"
-import { useQueryClient } from "@tanstack/react-query"
+import { useBackendCapabilities } from "../../hooks/useBackendCapabilities"
+import { fetchAllPages } from "../../lib/pagination"
+import { ExpenseCategorySettings } from "./ExpenseCategorySettings"
+import { LedgerRestoreSettings } from "./LedgerRestoreSettings"
+import { useState } from "react"
+import { useIsMutating } from "@tanstack/react-query"
+import { Download, Settings, Trash2, Upload } from "lucide-react"
 import { toast } from "sonner"
 import {
   API_ENDPOINTS,
-  getCurrentApiIndex,
+  api,
+  apiBaseUrl,
+  getApiErrorMessage,
   setApiEndpoint,
-  subscribeApiChange,
+  unwrapResponseData,
 } from "../../lib/api"
+import { downloadFile } from "../../lib/export"
+import { todayKey } from "../../lib/formHelpers"
+import { loadTemplates, parseTemplates, saveTemplates } from "../../lib/templates"
+import { useApiEndpoint } from "../../hooks/useApiEndpoint"
+import { useTemplates } from "../../hooks/useTemplates"
+import type {
+  ApiResponse,
+  SalaryLog,
+  SettlementDetail,
+  TradeRecord,
+  Transaction,
+} from "../../types"
+import { Button } from "../ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogClose,
+  DialogFooter,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog"
+import { Field, FieldLabel, FieldDescription } from "../ui/field"
+import { Alert, AlertDescription } from "../ui/alert"
 
-/**
- * Floating API environment switcher (bottom-right pill).
- * - Color-coded pill: green = remote, amber = local
- * - Health-check dot shows live connectivity
- * - Auto-invalidates all queries on switch
- * - Syncs UI when auto-failover kicks in
- */
-export function ApiSwitcher() {
-  const [activeIndex, setActiveIndex] = useState(getCurrentApiIndex)
-  const [isOpen, setIsOpen] = useState(false)
-  const [healthCheck, setHealthCheck] = useState<{
-    status: "online" | "offline"
-    url: string
-  } | null>(null)
-  const ref = useRef<HTMLDivElement>(null)
-  const queryClient = useQueryClient()
-
-  const current = API_ENDPOINTS[activeIndex]
-  const status = healthCheck?.url === current.url ? healthCheck.status : "checking"
-
-  // Subscribe to api layer changes (auto-failover sync)
-  useEffect(() => {
-    return subscribeApiChange((idx) => setActiveIndex(idx))
-  }, [])
-
-  // Health check on mount & endpoint change
-  useEffect(() => {
-    let cancelled = false
-
-    const controller = new AbortController()
-    fetch(`${current.url}/docs`, { method: "HEAD", signal: controller.signal })
-      .then(() => {
-        if (!cancelled) {
-          setHealthCheck({ status: "online", url: current.url })
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setHealthCheck({ status: "offline", url: current.url })
-        }
-      })
-
-    return () => { cancelled = true; controller.abort() }
-  }, [current.url])
-
-  // Close on outside click
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setIsOpen(false)
+function SettingsBody() {
+  const { capabilities } = useBackendCapabilities()
+  const endpoint = useApiEndpoint()
+  const current = API_ENDPOINTS.find((e) => e.key === endpoint)!
+  const mutations = useIsMutating()
+  const templates = useTemplates()
+  const [exporting, setExporting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function exportAll() {
+    setExporting(true)
+    setError(null)
+    const exportTemplates = loadTemplates()
+    const config = { baseURL: apiBaseUrl(endpoint) }
+    try {
+      if (capabilities.backups) {
+        const snapshot = await unwrapResponseData(api.get<ApiResponse<Record<string, unknown>>>("/ledger/backup", config))
+        downloadFile(`家庭账本-${todayKey()}.json`, JSON.stringify({ ...snapshot, endpoint, templates: exportTemplates }, null, 2), "application/json;charset=utf-8")
+        toast.success("完整备份已导出")
+        return
       }
+      const [transactions, salaryLogs, tradeRecords] = await Promise.all([
+        fetchAllPages<Transaction>("/transactions/", endpoint),
+        fetchAllPages<SalaryLog>("/salary_logs/", endpoint),
+        fetchAllPages<TradeRecord>("/trade_records/", endpoint),
+      ])
+      const settlements = await Promise.all(
+        transactions
+          .filter((t) => t.amount_reimbursed > 0)
+          .map(async (t) => ({
+            transactionId: t.id,
+            records: await unwrapResponseData(
+              api.get<ApiResponse<SettlementDetail[]>>(`/transactions/${t.id}/settlements`, config),
+            ),
+          })),
+      )
+      downloadFile(
+        `家庭账本-${todayKey()}.json`,
+        JSON.stringify(
+          {
+            version: 1,
+            exportedAt: new Date().toISOString(),
+            endpoint,
+            transactions,
+            salaryLogs,
+            tradeRecords,
+            settlements,
+            templates: exportTemplates,
+          },
+          null,
+          2,
+        ),
+        "application/json;charset=utf-8",
+      )
+      toast.success("完整记录已导出")
+    } catch (e) {
+      setError(getApiErrorMessage(e, "导出失败，请重试"))
+    } finally {
+      setExporting(false)
     }
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside)
-      return () => document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [isOpen])
-
-  function handleSelect(index: number) {
-    if (index === activeIndex) { setIsOpen(false); return }
-    setApiEndpoint(index)
-    setActiveIndex(index)
-    setIsOpen(false)
-    queryClient.invalidateQueries()
-    toast.success("已切换 API 环境", {
-      description: `当前连接：${API_ENDPOINTS[index].label}`,
-    })
   }
-
-  const statusDot =
-    status === "online"   ? "bg-emerald-500" :
-    status === "offline"  ? "bg-red-500" :
-                            "bg-amber-400 animate-pulse"
-
-  const pillStyle =
-    current.key === "local"
-      ? "border-amber-200 bg-amber-50/90 text-amber-700 hover:bg-amber-100"
-      : "border-emerald-200 bg-emerald-50/90 text-emerald-700 hover:bg-emerald-100"
-
   return (
-    <div ref={ref} className="fixed bottom-4 right-4 z-50">
-      {/* Expanded selection panel */}
-      {isOpen && (
-        <div className="mb-2 w-60 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg animate-in fade-in slide-in-from-bottom-2">
-          <div className="border-b border-slate-100 px-3 py-2">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">API 环境</p>
-          </div>
-          <div className="p-1.5">
-            {API_ENDPOINTS.map((endpoint, idx) => {
-              const isActive = idx === activeIndex
-              return (
-                <button
-                  key={endpoint.key}
-                  onClick={() => handleSelect(idx)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left transition-colors ${
-                    isActive
-                      ? "bg-slate-950 text-white"
-                      : "text-slate-600 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="text-base leading-none">{endpoint.label.split(" ")[0]}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-semibold ${isActive ? "text-white" : "text-slate-900"}`}>
-                      {endpoint.label.split(" ").slice(1).join(" ")}
-                    </p>
-                    <p className={`mt-0.5 truncate text-[11px] ${isActive ? "text-slate-300" : "text-slate-400"}`}>
-                      {endpoint.url}
-                    </p>
-                  </div>
-                  {isActive && (
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot}`} />
-                  )}
-                </button>
-              )
-            })}
-          </div>
-          <div className="border-t border-slate-100 px-3 py-2">
-            <p className="text-[10px] text-slate-400 leading-relaxed">
-              连接失败时系统会自动切换到下一个可用环境
-            </p>
-          </div>
+    <div className="flex flex-col gap-6">
+      <Field>
+        <FieldLabel htmlFor="ledger-source">账本连接</FieldLabel>
+        <select
+          id="ledger-source"
+          className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+          value={endpoint}
+          disabled={mutations > 0 || exporting}
+          onChange={(e) => setApiEndpoint(API_ENDPOINTS.findIndex((v) => v.key === e.target.value))}
+        >
+          <option value="remote">线上账本</option>
+          <option value="local">本地账本</option>
+        </select>
+        <FieldDescription>
+          当前：{current.url}。两个连接的数据彼此独立；正在保存时无法切换。
+        </FieldDescription>
+      </Field>
+      <Field>
+        <FieldLabel>数据导出</FieldLabel>
+        <FieldDescription>
+          {capabilities.backups ? "导出同一时刻的完整账本，包含原始字段、核销关系、分类和常用记录，可用于空账本恢复。" : "导出账单、收入、交易、核销历史和常用记录。当前连接使用旧版后端，导出记录不能完整恢复服务器账本。"}
+        </FieldDescription>
+        <Button
+          variant="outline"
+          onClick={() => {
+            void exportAll()
+          }}
+          disabled={exporting || mutations > 0}
+        >
+          <Download data-icon="inline-start" />
+          {exporting ? "正在导出…" : capabilities.backups ? "导出完整备份（JSON）" : "导出完整记录（JSON）"}
+        </Button>
+        {error && (
+          <Alert variant="destructive">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+      </Field>
+      {capabilities.restore && <LedgerRestoreSettings />}
+      {capabilities.expenseCategories && <ExpenseCategorySettings />}
+      <Field>
+        <FieldLabel htmlFor="template-import">常用记录 · {templates.length} 条</FieldLabel>
+        <FieldDescription>保存在此设备。导入会按标题合并，同名记录使用导入版本。</FieldDescription>
+        <label
+          htmlFor="template-import"
+          className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-md border px-3 text-sm font-medium hover:bg-muted"
+        >
+          <Upload className="size-4" aria-hidden="true" />
+          导入常用记录
+        </label>
+        <input
+          id="template-import"
+          type="file"
+          accept=".json,application/json"
+          className="sr-only"
+          disabled={exporting || mutations > 0}
+          onChange={async (e) => {
+            const file = e.currentTarget.files?.[0]
+            e.currentTarget.value = ""
+            if (!file) return
+            try {
+              if (file.size > 10 * 1024 * 1024) throw new Error("文件不能超过 10 MB")
+              const data = JSON.parse(await file.text())
+              const incoming = parseTemplates(Array.isArray(data) ? data : data.templates)
+              const merged = [
+                ...incoming,
+                ...loadTemplates().filter((t) => !incoming.some((v) => v.title === t.title)),
+              ]
+              saveTemplates(merged)
+              toast.success(`已导入 ${incoming.length} 条常用记录`)
+            } catch (err) {
+              toast.error(getApiErrorMessage(err, "导入失败"))
+            }
+          }}
+        />
+        <div className="flex max-h-52 flex-col divide-y overflow-y-auto">
+          {templates.map((t) => (
+            <div key={t.title} className="flex items-center justify-between gap-3 py-2">
+              <span className="min-w-0 truncate text-sm">
+                {t.title}
+                {t.repeatMonthly ? " · 每月提醒" : ""}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label={`删除常用记录：${t.title}`}
+                disabled={mutations > 0}
+                onClick={() => {
+                  try {
+                    saveTemplates(templates.filter((v) => v.title !== t.title))
+                  } catch {
+                    toast.error("删除失败")
+                  }
+                }}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            </div>
+          ))}
         </div>
-      )}
-
-      {/* Trigger — color-coded pill */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-md backdrop-blur-sm transition-all hover:shadow-lg active:scale-95 ${pillStyle}`}
-        title={`${current.label}\n${current.url}\n状态：${status === "online" ? "在线" : status === "offline" ? "离线" : "检测中"}`}
-      >
-        <span className={`h-1.5 w-1.5 rounded-full ${statusDot}`} />
-        {current.label}
-      </button>
+      </Field>
     </div>
+  )
+}
+export function ApiSwitcher() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Button variant="ghost" size="icon" aria-label="账本设置" onClick={() => setOpen(true)}>
+        <Settings className="size-4" />
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex flex-col overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6">
+            <DialogTitle>账本设置</DialogTitle>
+            <DialogDescription>管理连接、常用记录与数据导出。</DialogDescription>
+          </DialogHeader>
+          {open && <div className="min-h-0 overflow-y-auto px-6"><SettingsBody /></div>}
+          <DialogFooter className="border-t px-6 pb-6 pt-3">
+            <DialogClose asChild>
+              <Button variant="secondary">关闭设置</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

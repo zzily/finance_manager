@@ -1,11 +1,23 @@
+import { useApiEndpoint } from "./useApiEndpoint"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
-import { api, getApiErrorMessage, unwrapResponseData } from "../lib/api"
+import {
+  api,
+  apiBaseUrl,
+  type ApiEndpointKey,
+  getApiErrorMessage,
+  unwrapResponseData,
+} from "../lib/api"
 import type { ApiResponse, SettlementDetail } from "../types"
 
-async function fetchSettlements(transactionId: number): Promise<SettlementDetail[]> {
+async function fetchSettlements(
+  transactionId: number,
+  endpoint: ApiEndpointKey,
+): Promise<SettlementDetail[]> {
   return unwrapResponseData(
-    api.get<ApiResponse<SettlementDetail[]>>(`/transactions/${transactionId}/settlements`),
+    api.get<ApiResponse<SettlementDetail[]>>(`/transactions/${transactionId}/settlements`, {
+      baseURL: apiBaseUrl(endpoint),
+    }),
   )
 }
 
@@ -14,11 +26,12 @@ async function undoSettlementApi(settlementId: number) {
 }
 
 export function useSettlements(transactionId: number | null) {
+  const endpoint = useApiEndpoint()
   const queryClient = useQueryClient()
 
   const query = useQuery({
-    queryKey: ["settlements", transactionId],
-    queryFn: () => fetchSettlements(transactionId!),
+    queryKey: ["settlements", endpoint, transactionId],
+    queryFn: () => fetchSettlements(transactionId!, endpoint),
     enabled: transactionId !== null,
   })
 
@@ -27,7 +40,9 @@ export function useSettlements(transactionId: number | null) {
       queryClient.invalidateQueries({ queryKey: ["transactions"] }),
       queryClient.invalidateQueries({ queryKey: ["salary_logs"] }),
       queryClient.invalidateQueries({ queryKey: ["summary"] }),
-      queryClient.invalidateQueries({ queryKey: ["settlements", transactionId] }),
+      queryClient.invalidateQueries({
+        queryKey: ["settlements", endpoint, transactionId],
+      }),
     ])
 
   const undoMutation = useMutation({
@@ -37,7 +52,9 @@ export function useSettlements(transactionId: number | null) {
       toast.success("撤销成功", { description: "资金已退回资金池" })
     },
     onError: (error) => {
-      toast.error("撤销失败", { description: getApiErrorMessage(error, "请稍后重试") })
+      toast.error("撤销失败", {
+        description: getApiErrorMessage(error, "请稍后重试"),
+      })
     },
   })
 

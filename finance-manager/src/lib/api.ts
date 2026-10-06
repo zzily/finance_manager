@@ -34,7 +34,9 @@ const listeners = new Set<Listener>()
 
 export function subscribeApiChange(fn: Listener) {
   listeners.add(fn)
-  return () => { listeners.delete(fn) }
+  return () => {
+    listeners.delete(fn)
+  }
 }
 
 function notifyListeners() {
@@ -47,8 +49,13 @@ export function getCurrentApiIndex(): number {
 }
 
 export function setApiEndpoint(index: number) {
+  if (!API_ENDPOINTS[index]) return
   currentApiIndex = index
-  localStorage.setItem(STORAGE_KEY, API_ENDPOINTS[index].key)
+  try {
+    localStorage.setItem(STORAGE_KEY, API_ENDPOINTS[index].key)
+  } catch {
+    /* The current session still works without storage. */
+  }
   notifyListeners()
 }
 
@@ -56,16 +63,8 @@ function getCurrentBaseURL(): string {
   return API_ENDPOINTS[currentApiIndex].url
 }
 
-// 自动故障切换
-function switchToNextAPI(): boolean {
-  if (currentApiIndex < API_ENDPOINTS.length - 1) {
-    currentApiIndex++
-    localStorage.setItem(STORAGE_KEY, API_ENDPOINTS[currentApiIndex].key)
-    console.warn(`⚠️ API 自动切换到: ${API_ENDPOINTS[currentApiIndex].label}`)
-    notifyListeners()
-    return true
-  }
-  return false
+export function apiBaseUrl(key: ApiEndpointKey) {
+  return API_ENDPOINTS.find((endpoint) => endpoint.key === key)!.url
 }
 
 export const api = axios.create({
@@ -77,14 +76,18 @@ type ApiErrorPayload = Partial<ApiResponse<unknown>> & { detail?: string }
 
 export async function unwrapResponseData<T>(request: ApiRequest<T>): Promise<T> {
   const response = await request
+  if (response.data.code >= 400) throw new Error(response.data.message || "请求失败")
   return response.data.data
 }
 
 export function getApiErrorMessage(error: unknown, fallback: string): string {
   if (!axios.isAxiosError<ApiErrorPayload>(error)) {
-    return fallback
+    return error instanceof Error && error.message ? error.message : fallback
   }
 
+  if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT")
+    return "请求超时，请刷新核对记录后再重试"
+  if (error.code === "ERR_NETWORK") return "连接中断，请检查网络并刷新核对记录"
   const data = error.response?.data
   if (typeof data?.message === "string" && data.message) {
     return data.message
@@ -99,35 +102,9 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 }
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  config.baseURL = getCurrentBaseURL()
+  config.baseURL ??= getCurrentBaseURL()
   return config
 })
 
-api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const config = error.config
-    if (!config) {
-      return Promise.reject(error)
-    }
-
-    if (!config._retryApiIndex) {
-      config._retryApiIndex = currentApiIndex
-    }
-
-    const isNetworkError = !error.response
-    const isServerError = error.response?.status >= 500
-    const isTimeout = error.code === "ECONNABORTED"
-
-    if ((isNetworkError || isServerError || isTimeout) && switchToNextAPI()) {
-      console.warn(`🔄 正在重试请求: ${config.url}`)
-      config.baseURL = getCurrentBaseURL()
-      return api.request(config)
-    }
-
-    currentApiIndex = 0
-    localStorage.setItem(STORAGE_KEY, API_ENDPOINTS[0].key)
-    notifyListeners()
-    return Promise.reject(error)
-  }
-)
+// A failed or timed-out financial operation must remain on the same ledger.
+// Reads may be retried by React Query; writes are never replayed to another API.
