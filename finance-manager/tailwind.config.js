@@ -1,3 +1,6 @@
+import animate from "tailwindcss-animate"
+import containerQueries from "@tailwindcss/container-queries"
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
@@ -28,6 +31,7 @@ export default {
           "expense",
           "warning",
           "warning-foreground",
+          "info",
         ].map((name) => [name, `hsl(var(--${name}) / <alpha-value>)`]),
       ),
       borderRadius: {
@@ -42,5 +46,5 @@ export default {
       },
     },
   },
-  plugins: [],
-};
+  plugins: [animate, containerQueries],
+}

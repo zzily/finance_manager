@@ -1,8 +1,14 @@
+import { NativeSelect } from "../ui/native-select"
 import { useId, useState } from "react"
 
-import { FieldGroup, FieldLabel } from "../ui/field"
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldDescription,
+  FieldError,
+} from "../ui/field"
 import { todayKey, moneyError } from "../../lib/formHelpers"
-import { ErrorBox } from "../common"
 import { Button } from "../ui/button"
 import {
   Dialog,
@@ -68,32 +74,25 @@ function EditTransactionDialogBody({
   const [form, setForm] = useState<TransactionUpdate>(() =>
     createTransactionForm(transaction),
   )
-  const [error, setError] = useState<string | null>(null)
-
-  function handleSubmit() {
-    if (!transaction) return
-    if (!form.title.trim()) {
-      setError("请输入账单标题")
-      return
-    }
-    const amount = Number(form.amount_out)
-    const amountError = moneyError(amount)
-    if (amountError) {
-      setError(amountError)
-      return
-    }
-    if (amount < transaction.amount_reimbursed) {
-      setError("金额不能低于已核销金额")
-      return
-    }
-    if (
+  const [attempted, setAttempted] = useState(false)
+  const errors = {
+    title: form.title.trim() ? null : "请输入账单标题",
+    amount:
+      moneyError(form.amount_out) ??
+      (transaction && Number(form.amount_out) < transaction.amount_reimbursed
+        ? "金额不能低于已核销金额"
+        : null),
+    date:
       supportsOccurrenceDate &&
       (!form.occurred_at || form.occurred_at > todayKey())
-    ) {
-      setError("请选择不晚于今天的发生日期")
-      return
-    }
-    setError(null)
+        ? "请选择不晚于今天的发生日期"
+        : null,
+  }
+
+  function handleSubmit() {
+    setAttempted(true)
+    if (!transaction || isPending || Object.values(errors).some(Boolean)) return
+    const amount = Number(form.amount_out)
     onSubmit(transaction.id, {
       title: form.title.trim(),
       amount_out: amount,
@@ -107,128 +106,169 @@ function EditTransactionDialogBody({
 
   return (
     <DialogContent className="flex flex-col overflow-hidden p-0">
-      <DialogHeader className="px-6 pt-6">
-        <DialogTitle>编辑账单</DialogTitle>
-        <DialogDescription>修改标题、金额或分类</DialogDescription>
-      </DialogHeader>
-      <FieldGroup className="min-h-0 gap-4 overflow-y-auto px-6">
-        {supportsOccurrenceDate && (
-          <div className="space-y-1.5">
-            <FieldLabel htmlFor={`${id}-date`}>发生日期</FieldLabel>
-            <Input
-              id={`${id}-date`}
-              type="date"
-              max={todayKey()}
-              value={form.occurred_at ?? ""}
-              onChange={(e) =>
-                setForm((prev) => ({ ...prev, occurred_at: e.target.value }))
-              }
-            />
-            {transaction?.occurred_at_inferred && (
-              <p className="text-xs text-muted-foreground">
-                旧账单日期暂按录入时间估算，可以在此修改。
-              </p>
-            )}
-          </div>
-        )}
+      <form
+        id={`${id}-form`}
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault()
+          handleSubmit()
+        }}
+        className="flex min-h-0 flex-col gap-5"
+      >
+        <DialogHeader className="px-6 pt-6">
+          <DialogTitle>编辑账单</DialogTitle>
+          <DialogDescription>修改标题、金额或分类</DialogDescription>
+        </DialogHeader>
+        <FieldGroup className="min-h-0 gap-4 overflow-y-auto px-6">
+          {supportsOccurrenceDate && (
+            <Field
+              className="gap-1.5"
+              data-invalid={attempted && Boolean(errors.date)}
+            >
+              <FieldLabel htmlFor={`${id}-date`}>发生日期</FieldLabel>
+              <Input
+                id={`${id}-date`}
+                aria-invalid={attempted && Boolean(errors.date)}
+                aria-describedby={
+                  attempted && errors.date ? `${id}-date-error` : undefined
+                }
+                type="date"
+                max={todayKey()}
+                value={form.occurred_at ?? ""}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, occurred_at: e.target.value }))
+                }
+              />
+              {transaction?.occurred_at_inferred && (
+                <FieldDescription className="text-xs">
+                  旧账单日期暂按录入时间估算，可以在此修改。
+                </FieldDescription>
+              )}
+              {attempted && errors.date && (
+                <FieldError id={`${id}-date-error`}>{errors.date}</FieldError>
+              )}
+            </Field>
+          )}
 
-        <div className="space-y-1.5">
-          <FieldLabel htmlFor={`${id}-title`}>标题</FieldLabel>
-          <Input
-            id={`${id}-title`}
-            value={form.title}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, title: e.target.value }))
-            }
-            placeholder="例如：给车加油"
-            autoFocus
-          />
-        </div>
-        <div className="space-y-1.5">
-          <FieldLabel htmlFor={`${id}-amount`}>金额（人民币）</FieldLabel>
-          <Input
-            id={`${id}-amount`}
-            inputMode="decimal"
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.amount_out || ""}
-            onChange={(e) =>
-              setForm((prev) => ({
-                ...prev,
-                amount_out: Number(e.target.value),
-              }))
-            }
-            placeholder="请输入账单金额"
-          />
-        </div>
-        <div className="space-y-1.5">
-          <FieldLabel htmlFor={`${id}-category`}>分类</FieldLabel>
-          <Select
-            value={form.category}
-            onValueChange={(value) => {
-              setForm((prev) => ({
-                ...prev,
-                category: value as TransactionUpdate["category"],
-                expense_category_id: null,
-              }))
-            }}
+          <Field
+            className="gap-1.5"
+            data-invalid={attempted && Boolean(errors.title)}
           >
-            <SelectTrigger id={`${id}-category`}>
-              <SelectValue placeholder="请选择分类" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="work">工作</SelectItem>
-              <SelectItem value="personal">个人</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {supportsCategories && (
-          <div className="space-y-1.5">
-            <FieldLabel htmlFor={`${id}-expense-category`}>支出分类</FieldLabel>
-            <select
-              id={`${id}-expense-category`}
-              className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-              value={form.expense_category_id ?? ""}
+            <FieldLabel htmlFor={`${id}-title`}>标题</FieldLabel>
+            <Input
+              id={`${id}-title`}
+              aria-invalid={attempted && Boolean(errors.title)}
+              aria-describedby={
+                attempted && errors.title ? `${id}-title-error` : undefined
+              }
+              value={form.title}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, title: e.target.value }))
+              }
+              placeholder="例如：给车加油"
+              autoFocus
+            />
+            {attempted && errors.title && (
+              <FieldError id={`${id}-title-error`}>{errors.title}</FieldError>
+            )}
+          </Field>
+          <Field
+            className="gap-1.5"
+            data-invalid={attempted && Boolean(errors.amount)}
+          >
+            <FieldLabel htmlFor={`${id}-amount`}>金额（人民币）</FieldLabel>
+            <Input
+              id={`${id}-amount`}
+              aria-invalid={attempted && Boolean(errors.amount)}
+              aria-describedby={
+                attempted && errors.amount ? `${id}-amount-error` : undefined
+              }
+              inputMode="decimal"
+              type="number"
+              min="0"
+              step="0.01"
+              value={form.amount_out || ""}
               onChange={(e) =>
                 setForm((prev) => ({
                   ...prev,
-                  expense_category_id: e.target.value
-                    ? Number(e.target.value)
-                    : null,
+                  amount_out: Number(e.target.value),
                 }))
               }
+              placeholder="请输入账单金额"
+            />
+            {attempted && errors.amount && (
+              <FieldError id={`${id}-amount-error`}>{errors.amount}</FieldError>
+            )}
+          </Field>
+          <Field className="gap-1.5">
+            <FieldLabel htmlFor={`${id}-category`}>分类</FieldLabel>
+            <Select
+              value={form.category}
+              onValueChange={(value) => {
+                setForm((prev) => ({
+                  ...prev,
+                  category: value as TransactionUpdate["category"],
+                  expense_category_id: null,
+                }))
+              }}
             >
-              <option value="">未分类</option>
-              {categories
-                .filter(
-                  (c) =>
-                    c.kind === form.category &&
-                    (!c.archived || c.id === form.expense_category_id),
-                )
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                    {c.archived ? "（已停用）" : ""}
-                  </option>
-                ))}
-            </select>
-          </div>
-        )}
-        {error && <ErrorBox msg={error} />}
-      </FieldGroup>
-      <DialogFooter className="border-t px-6 pb-6 pt-3">
-        <Button
-          variant="secondary"
-          onClick={() => onOpenChange(false)}
-          disabled={isPending}
-        >
-          取消
-        </Button>
-        <Button onClick={handleSubmit} disabled={isPending}>
-          {isPending ? "保存中..." : "保存修改"}
-        </Button>
-      </DialogFooter>
+              <SelectTrigger id={`${id}-category`}>
+                <SelectValue placeholder="请选择分类" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="work">工作</SelectItem>
+                <SelectItem value="personal">个人</SelectItem>
+              </SelectContent>
+            </Select>
+          </Field>
+          {supportsCategories && (
+            <Field className="gap-1.5">
+              <FieldLabel htmlFor={`${id}-expense-category`}>
+                支出分类
+              </FieldLabel>
+              <NativeSelect
+                id={`${id}-expense-category`}
+                value={form.expense_category_id ?? ""}
+                onChange={(e) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    expense_category_id: e.target.value
+                      ? Number(e.target.value)
+                      : null,
+                  }))
+                }
+              >
+                <option value="">未分类</option>
+                {categories
+                  .filter(
+                    (c) =>
+                      c.kind === form.category &&
+                      (!c.archived || c.id === form.expense_category_id),
+                  )
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                      {c.archived ? "（已停用）" : ""}
+                    </option>
+                  ))}
+              </NativeSelect>
+            </Field>
+          )}
+        </FieldGroup>
+        <DialogFooter className="border-t px-6 pb-6 pt-3">
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
+            取消
+          </Button>
+          <Button type="submit" disabled={isPending}>
+            {isPending ? "保存中..." : "保存修改"}
+          </Button>
+        </DialogFooter>
+      </form>
     </DialogContent>
   )
 }

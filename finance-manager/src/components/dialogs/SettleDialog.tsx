@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useId } from "react"
 import {
   Dialog,
   DialogContent,
@@ -9,8 +9,22 @@ import {
 } from "../ui/dialog"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select"
-import { ErrorBox } from "../common"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select"
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  FieldTitle,
+  FieldDescription,
+  FieldError,
+} from "../ui/field"
+import { moneyError } from "../../lib/formHelpers"
 import { currency } from "../../lib/formatters"
 import type { Transaction, SalaryLog } from "../../types"
 
@@ -35,10 +49,12 @@ export function SettleDialog({
 }) {
   const [selectedSalaryId, setSelectedSalaryId] = useState("")
   const [amount, setAmount] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const id = useId()
+  const [attempted, setAttempted] = useState(false)
 
   const remainingDebt = useMemo(
-    () => (transaction ? transaction.amount_out - transaction.amount_reimbursed : 0),
+    () =>
+      transaction ? transaction.amount_out - transaction.amount_reimbursed : 0,
     [transaction],
   )
   const selectedSalary = useMemo(
@@ -50,105 +66,157 @@ export function SettleDialog({
     if (v) {
       setSelectedSalaryId("")
       setAmount("")
-      setError(null)
+      setAttempted(false)
     }
     onOpenChange(v)
   }
 
+  const errors = {
+    income: isErrorLogs
+      ? "回款加载失败，请重试"
+      : !selectedSalary
+        ? "请选择一笔可用的回款"
+        : null,
+    amount:
+      moneyError(amount) ??
+      (Number(amount) > remainingDebt
+        ? "核销金额不能超过未结清金额"
+        : selectedSalary && Number(amount) > selectedSalary.amount_unused
+          ? "核销金额不能超过回款余额"
+          : null),
+  }
   function handleSubmit() {
-    if (!transaction) return
-    if (!selectedSalaryId) {
-      setError("请选择一笔可用的回款")
+    setAttempted(true)
+    if (
+      !transaction ||
+      isPending ||
+      isLoadingLogs ||
+      Object.values(errors).some(Boolean)
+    )
       return
-    }
     const n = Number(amount)
-    if (!amount || isNaN(n) || n <= 0) {
-      setError("请输入有效金额")
-      return
-    }
-    if (n > remainingDebt) {
-      setError("核销金额不能超过未结清金额")
-      return
-    }
-    if (selectedSalary && n > selectedSalary.amount_unused) {
-      setError("核销金额不能超过回款余额")
-      return
-    }
-    setError(null)
     onSubmit(Number(selectedSalaryId), n)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
-        <DialogHeader>
-          <DialogTitle>核销账单</DialogTitle>
-          <DialogDescription>选择回款并输入本次核销金额</DialogDescription>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">账单</p>
-            <div className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
-              {transaction ? `${transaction.title}  未结清 ${currency.format(remainingDebt)}` : ""}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">选择回款</label>
-            <Select value={selectedSalaryId} onValueChange={setSelectedSalaryId}>
-              <SelectTrigger>
-                <SelectValue placeholder="请选择可用回款" />
-              </SelectTrigger>
-              <SelectContent>
-                {isLoadingLogs && (
-                  <SelectItem value="loading" disabled>
-                    加载中
-                  </SelectItem>
-                )}
-                {isErrorLogs && (
-                  <SelectItem value="error" disabled>
-                    回款加载失败
-                  </SelectItem>
-                )}
-                {!isLoadingLogs && availableLogs.length === 0 && (
-                  <SelectItem value="empty" disabled>
-                    暂无可用回款
-                  </SelectItem>
-                )}
-                {availableLogs.map((log) => (
-                  <SelectItem key={log.id} value={String(log.id)}>
-                    {`${log.month}  余额 ${currency.format(log.amount_unused)}`}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">核销金额</label>
-            <Input
-              type="number"
-              min="0"
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="请输入核销金额"
-              autoFocus
-            />
-            {selectedSalary && (
-              <p className="text-xs text-muted-foreground">
-                回款余额：{currency.format(selectedSalary.amount_unused)}
-              </p>
-            )}
-          </div>
-          {error && <ErrorBox msg={error} />}
-        </div>
-        <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>
-            取消
-          </Button>
-          <Button onClick={handleSubmit} disabled={isPending}>
-            {isPending ? "提交中..." : "确认核销"}
-          </Button>
-        </DialogFooter>
+        <form
+          noValidate
+          onSubmit={(e) => {
+            e.preventDefault()
+            handleSubmit()
+          }}
+          className="flex flex-col gap-5"
+        >
+          <DialogHeader>
+            <DialogTitle>核销账单</DialogTitle>
+            <DialogDescription>选择回款并输入本次核销金额</DialogDescription>
+          </DialogHeader>
+          <FieldGroup className="gap-4">
+            <Field className="gap-1.5">
+              <FieldTitle>账单</FieldTitle>
+              <div className="rounded-lg border border-border bg-muted px-3 py-2 text-sm text-foreground">
+                {transaction
+                  ? `${transaction.title}  未结清 ${currency.format(remainingDebt)}`
+                  : ""}
+              </div>
+            </Field>
+            <Field
+              className="gap-1.5"
+              data-invalid={attempted && Boolean(errors.income)}
+            >
+              <FieldLabel htmlFor={`${id}-income`}>选择回款</FieldLabel>
+              <Select
+                value={selectedSalaryId}
+                onValueChange={setSelectedSalaryId}
+              >
+                <SelectTrigger
+                  id={`${id}-income`}
+                  disabled={isLoadingLogs || isErrorLogs}
+                  aria-invalid={attempted && Boolean(errors.income)}
+                  aria-describedby={
+                    attempted && errors.income
+                      ? `${id}-income-error`
+                      : undefined
+                  }
+                >
+                  <SelectValue placeholder="请选择可用回款" />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingLogs && (
+                    <SelectItem value="loading" disabled>
+                      加载中
+                    </SelectItem>
+                  )}
+                  {isErrorLogs && (
+                    <SelectItem value="error" disabled>
+                      回款加载失败
+                    </SelectItem>
+                  )}
+                  {!isLoadingLogs && availableLogs.length === 0 && (
+                    <SelectItem value="empty" disabled>
+                      暂无可用回款
+                    </SelectItem>
+                  )}
+                  {availableLogs.map((log) => (
+                    <SelectItem key={log.id} value={String(log.id)}>
+                      {`${log.month}  余额 ${currency.format(log.amount_unused)}`}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {attempted && errors.income && (
+                <FieldError id={`${id}-income-error`}>
+                  {errors.income}
+                </FieldError>
+              )}
+            </Field>
+            <Field
+              className="gap-1.5"
+              data-invalid={attempted && Boolean(errors.amount)}
+            >
+              <FieldLabel htmlFor={`${id}-amount`}>核销金额</FieldLabel>
+              <Input
+                id={`${id}-amount`}
+                aria-invalid={attempted && Boolean(errors.amount)}
+                aria-describedby={
+                  attempted && errors.amount ? `${id}-amount-error` : undefined
+                }
+                type="number"
+                min="0"
+                step="0.01"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="请输入核销金额"
+                autoFocus
+              />
+              {attempted && errors.amount && (
+                <FieldError id={`${id}-amount-error`}>
+                  {errors.amount}
+                </FieldError>
+              )}
+              {selectedSalary && (
+                <FieldDescription className="text-xs">
+                  回款余额：{currency.format(selectedSalary.amount_unused)}
+                </FieldDescription>
+              )}
+            </Field>
+          </FieldGroup>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+            >
+              取消
+            </Button>
+            <Button type="submit" disabled={isPending}>
+              {isPending ? "提交中..." : "确认核销"}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   )

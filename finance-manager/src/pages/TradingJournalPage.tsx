@@ -18,8 +18,6 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
   XAxis,
   YAxis,
 } from "recharts"
@@ -40,7 +38,26 @@ import { TradeDeleteDialog } from "../components/dialogs/TradeDeleteDialog"
 import { TradeRecordDialog } from "../components/dialogs/TradeRecordDialog"
 import { Badge } from "../components/ui/badge"
 import { Button } from "../components/ui/button"
-import { Input } from "../components/ui/input"
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "../components/ui/input-group"
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "../components/ui/chart"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "../components/ui/card"
+import { Alert, AlertTitle, AlertDescription } from "../components/ui/alert"
+import { Skeleton } from "../components/ui/skeleton"
 import { useTradeJournal } from "../hooks/useTradeJournal"
 import { currency } from "../lib/formatters"
 import {
@@ -69,6 +86,11 @@ import {
 import { cn } from "../lib/utils"
 import type { TradeRecord, TradeRecordInput } from "../types"
 
+const journalChartConfig = {
+  equity: { label: "累计净收益", color: "hsl(var(--chart-1))" },
+  netPnl: { label: "月度净收益", color: "hsl(var(--chart-5))" },
+} satisfies ChartConfig
+
 const RESULT_FILTERS: Array<{ label: string; value: TradeOutcomeFilter }> = [
   { label: "全部结果", value: "all" },
   { label: "只看盈利", value: "win" },
@@ -93,7 +115,10 @@ function formatPercent(value: number | null) {
     return "未标记"
   }
 
-  const rounded = value >= 100 || Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1)
+  const rounded =
+    value >= 100 || Number.isInteger(value)
+      ? value.toFixed(0)
+      : value.toFixed(1)
   return `${rounded}%`
 }
 
@@ -163,18 +188,20 @@ function SectionCard({
   icon: typeof Target
 }) {
   return (
-    <section className="rounded-lg border bg-card p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
+    <Card>
+      <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-semibold text-foreground">{title}</p>
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription className="mt-2 leading-6">
+            {description}
+          </CardDescription>
         </div>
         <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-muted text-foreground">
           <Icon size={18} />
         </div>
-      </div>
-      <div className="mt-5">{children}</div>
-    </section>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   )
 }
 
@@ -221,59 +248,25 @@ function OverviewCard({
   )
 }
 
-function MiniMetric({ label, value, hint }: { label: string; value: string; hint: string }) {
-  return (
-    <div className="rounded-2xl border border-border bg-card px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-xl font-bold tracking-tight text-foreground">{value}</p>
-      <p className="mt-1 text-xs leading-5 text-muted-foreground">{hint}</p>
-    </div>
-  )
-}
-
-function ChartTooltip({
-  active,
-  payload,
+function MiniMetric({
   label,
+  value,
+  hint,
 }: {
-  active?: boolean
-  payload?: Array<{
-    dataKey?: string
-    value?: number
-    color?: string
-    name?: string
-  }>
-  label?: string
+  label: string
+  value: string
+  hint: string
 }) {
-  if (!active || !payload?.length) {
-    return null
-  }
-
   return (
-    <div className="rounded-2xl border border-border bg-card px-3 py-2 shadow-lg">
-      <p className="text-xs font-semibold text-foreground">{label}</p>
-      <div className="mt-2 space-y-1.5">
-        {payload.map((item) => (
-          <div
-            key={`${item.dataKey}-${item.name}`}
-            className="flex items-center justify-between gap-4 text-xs"
-          >
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span
-                className="inline-flex h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: item.color ?? "#0f172a" }}
-              />
-              <span>{item.name}</span>
-            </div>
-            <span className="font-semibold text-foreground">
-              {currency.format(Number(item.value ?? 0))}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-xs text-muted-foreground">{label}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-xl font-bold tracking-tight">{value}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{hint}</p>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -292,24 +285,36 @@ function BreakdownCard({
   }>
 }) {
   return (
-    <div className="rounded-3xl border border-border bg-card p-5 shadow-sm">
-      <p className="text-sm font-semibold text-foreground">{title}</p>
-      <div className="mt-4 space-y-3">
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
         {rows.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border px-4 py-6 text-sm text-muted-foreground">
-            暂无足够数据
-          </div>
+          <Empty>
+            <EmptyHeader>
+              <EmptyTitle>暂无足够数据</EmptyTitle>
+              <EmptyDescription>交易记录累计后显示分组统计。</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
         ) : (
           rows.map((row) => (
             <div key={row.key} className="rounded-2xl bg-muted px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-foreground">{row.label}</p>
+                  <p className="truncate font-medium text-foreground">
+                    {row.label}
+                  </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     {row.trades} 笔 | 胜率 {formatPercent(row.winRate)}
                   </p>
                 </div>
-                <div className={cn("text-right text-sm font-semibold", getPnlTone(row.netPnl))}>
+                <div
+                  className={cn(
+                    "text-right text-sm font-semibold",
+                    getPnlTone(row.netPnl),
+                  )}
+                >
                   {formatSignedCurrency(row.netPnl)}
                 </div>
               </div>
@@ -319,8 +324,8 @@ function BreakdownCard({
             </div>
           ))
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -330,7 +335,11 @@ function buildHeatmapDays(calendar: TradeCalendarDay[]) {
   const days: Array<TradeCalendarDay & { empty: boolean }> = []
 
   for (let offset = 55; offset >= 0; offset -= 1) {
-    const date = new Date(today.getFullYear(), today.getMonth(), today.getDate() - offset)
+    const date = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() - offset,
+    )
     const key = [
       date.getFullYear(),
       String(date.getMonth() + 1).padStart(2, "0"),
@@ -362,14 +371,14 @@ function getHeatmapTone(value: number, maxAbs: number) {
   const ratio = Math.abs(value) / maxAbs
 
   if (value > 0) {
-    if (ratio > 0.66) return "bg-emerald-600"
-    if (ratio > 0.33) return "bg-emerald-400"
-    return "bg-emerald-200"
+    if (ratio > 0.66) return "bg-income"
+    if (ratio > 0.33) return "bg-income/60"
+    return "bg-income/30"
   }
 
-  if (ratio > 0.66) return "bg-red-600"
-  if (ratio > 0.33) return "bg-red-400"
-  return "bg-red-200"
+  if (ratio > 0.66) return "bg-destructive"
+  if (ratio > 0.33) return "bg-destructive/60"
+  return "bg-destructive/30"
 }
 
 export function TradingJournalPage() {
@@ -380,17 +389,25 @@ export function TradingJournalPage() {
   const [query, setQuery] = useState("")
   const [outcomeFilter, setOutcomeFilter] = useState<TradeOutcomeFilter>("all")
 
-  const metrics = useMemo(() => getTradeMetricGroups(journal.records), [journal.records])
-  const analytics = useMemo(() => getTradeAnalytics(journal.records), [journal.records])
+  const metrics = useMemo(
+    () => getTradeMetricGroups(journal.records),
+    [journal.records],
+  )
+  const analytics = useMemo(
+    () => getTradeAnalytics(journal.records),
+    [journal.records],
+  )
   const filteredRecords = useMemo(
     () =>
-      filterTradeRecords(journal.records, query, outcomeFilter).sort((left, right) =>
-        getRecordSortKey(right).localeCompare(getRecordSortKey(left)),
+      filterTradeRecords(journal.records, query, outcomeFilter).sort(
+        (left, right) =>
+          getRecordSortKey(right).localeCompare(getRecordSortKey(left)),
       ),
     [journal.records, outcomeFilter, query],
   )
   const filteredNetPnl = useMemo(
-    () => filteredRecords.reduce((sum, record) => sum + getTradeNetPnl(record), 0),
+    () =>
+      filteredRecords.reduce((sum, record) => sum + getTradeNetPnl(record), 0),
     [filteredRecords],
   )
 
@@ -443,7 +460,10 @@ export function TradingJournalPage() {
   }
 
   const heatmapDays = buildHeatmapDays(analytics.calendar)
-  const heatmapAbsMax = Math.max(...heatmapDays.map((item) => Math.abs(item.netPnl)), 0)
+  const heatmapAbsMax = Math.max(
+    ...heatmapDays.map((item) => Math.abs(item.netPnl)),
+    0,
+  )
 
   return (
     <div className="space-y-5">
@@ -558,46 +578,86 @@ export function TradingJournalPage() {
                   icon={LineChartIcon}
                 >
                   {analytics.equityCurve.length === 0 ? (
-                    <div className="flex h-[320px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted text-sm text-muted-foreground">
-                      录入交易后，这里会显示资金曲线和回撤变化。
-                    </div>
+                    <Empty className="h-[320px]">
+                      <EmptyHeader>
+                        <EmptyTitle>暂无分析数据</EmptyTitle>
+                        <EmptyDescription>
+                          录入交易后，这里会显示资金曲线和回撤变化。
+                        </EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   ) : (
                     <div className="h-[320px]">
-                      <ResponsiveContainer width="100%" height="100%">
+                      <ChartContainer
+                        config={journalChartConfig}
+                        className="h-full w-full aspect-auto"
+                      >
                         <AreaChart
+                          accessibilityLayer
                           data={analytics.equityCurve}
                           margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
                         >
                           <defs>
-                            <linearGradient id="equityFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                              <stop offset="100%" stopColor="#10b981" stopOpacity={0.04} />
+                            <linearGradient
+                              id="equityFill"
+                              x1="0"
+                              y1="0"
+                              x2="0"
+                              y2="1"
+                            >
+                              <stop
+                                offset="0%"
+                                stopColor="var(--color-equity)"
+                                stopOpacity={0.35}
+                              />
+                              <stop
+                                offset="100%"
+                                stopColor="var(--color-equity)"
+                                stopOpacity={0.04}
+                              />
                             </linearGradient>
                           </defs>
-                          <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                          <CartesianGrid
+                            stroke="hsl(var(--border))"
+                            strokeDasharray="3 3"
+                          />
                           <XAxis
                             dataKey="label"
-                            tick={{ fontSize: 11, fill: "#94a3b8" }}
+                            tick={{
+                              fontSize: 11,
+                              fill: "hsl(var(--muted-foreground))",
+                            }}
                             tickLine={false}
                             axisLine={false}
                           />
                           <YAxis
-                            tick={{ fontSize: 11, fill: "#94a3b8" }}
+                            tick={{
+                              fontSize: 11,
+                              fill: "hsl(var(--muted-foreground))",
+                            }}
                             tickLine={false}
                             axisLine={false}
                             tickFormatter={(value) => `${Math.round(value)}`}
                           />
-                          <Tooltip content={<ChartTooltip />} />
+                          <ChartTooltip
+                            content={
+                              <ChartTooltipContent
+                                valueFormatter={(value) =>
+                                  currency.format(Number(value))
+                                }
+                              />
+                            }
+                          />
                           <Area
                             type="monotone"
                             dataKey="equity"
                             name="累计净收益"
-                            stroke="#059669"
+                            stroke="var(--color-equity)"
                             fill="url(#equityFill)"
                             strokeWidth={2.5}
                           />
                         </AreaChart>
-                      </ResponsiveContainer>
+                      </ChartContainer>
                     </div>
                   )}
                 </SectionCard>
@@ -614,7 +674,7 @@ export function TradingJournalPage() {
                           key={day.date}
                           title={`${day.date} · ${formatSignedCurrency(day.netPnl)} · ${day.count} 笔`}
                           className={cn(
-                            "h-8 rounded-xl border border-white/70",
+                            "h-8 rounded-xl border border-background/70",
                             getHeatmapTone(day.netPnl, heatmapAbsMax),
                           )}
                         />
@@ -632,37 +692,61 @@ export function TradingJournalPage() {
                     icon={TrendingUp}
                   >
                     {analytics.monthlyBars.length === 0 ? (
-                      <div className="flex h-[180px] items-center justify-center rounded-3xl border border-dashed border-border bg-muted text-sm text-muted-foreground">
-                        暂无月度数据
-                      </div>
+                      <Empty className="h-[180px]">
+                        <EmptyHeader>
+                          <EmptyTitle>暂无分析数据</EmptyTitle>
+                          <EmptyDescription>暂无月度数据</EmptyDescription>
+                        </EmptyHeader>
+                      </Empty>
                     ) : (
                       <div className="h-[180px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <ChartContainer
+                          config={journalChartConfig}
+                          className="h-full w-full aspect-auto"
+                        >
                           <BarChart
+                            accessibilityLayer
                             data={analytics.monthlyBars}
                             margin={{ top: 8, right: 8, left: -20, bottom: 0 }}
                           >
-                            <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 3" />
+                            <CartesianGrid
+                              stroke="hsl(var(--border))"
+                              strokeDasharray="3 3"
+                            />
                             <XAxis
                               dataKey="label"
-                              tick={{ fontSize: 11, fill: "#94a3b8" }}
+                              tick={{
+                                fontSize: 11,
+                                fill: "hsl(var(--muted-foreground))",
+                              }}
                               tickLine={false}
                               axisLine={false}
                             />
                             <YAxis
-                              tick={{ fontSize: 11, fill: "#94a3b8" }}
+                              tick={{
+                                fontSize: 11,
+                                fill: "hsl(var(--muted-foreground))",
+                              }}
                               tickLine={false}
                               axisLine={false}
                             />
-                            <Tooltip content={<ChartTooltip />} />
+                            <ChartTooltip
+                              content={
+                                <ChartTooltipContent
+                                  valueFormatter={(value) =>
+                                    currency.format(Number(value))
+                                  }
+                                />
+                              }
+                            />
                             <Bar
                               dataKey="netPnl"
                               name="月度净收益"
-                              fill="#0f172a"
+                              fill="var(--color-netPnl)"
                               radius={[8, 8, 0, 0]}
                             />
                           </BarChart>
-                        </ResponsiveContainer>
+                        </ChartContainer>
                       </div>
                     )}
                   </SectionCard>
@@ -671,10 +755,22 @@ export function TradingJournalPage() {
 
               <section className="grid gap-4 xl:grid-cols-[1.35fr_0.65fr]">
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <BreakdownCard title="按 Setup 拆解" rows={analytics.breakouts.bySetup} />
-                  <BreakdownCard title="按标的拆解" rows={analytics.breakouts.bySymbol} />
-                  <BreakdownCard title="按时段拆解" rows={analytics.breakouts.bySession} />
-                  <BreakdownCard title="按持仓风格拆解" rows={analytics.breakouts.byHoldingStyle} />
+                  <BreakdownCard
+                    title="按 Setup 拆解"
+                    rows={analytics.breakouts.bySetup}
+                  />
+                  <BreakdownCard
+                    title="按标的拆解"
+                    rows={analytics.breakouts.bySymbol}
+                  />
+                  <BreakdownCard
+                    title="按时段拆解"
+                    rows={analytics.breakouts.bySession}
+                  />
+                  <BreakdownCard
+                    title="按持仓风格拆解"
+                    rows={analytics.breakouts.byHoldingStyle}
+                  />
                 </div>
 
                 <div className="space-y-4">
@@ -698,7 +794,8 @@ export function TradingJournalPage() {
                           成本占比
                         </p>
                         <p className="mt-2 text-sm text-muted-foreground">
-                          手续费和滑点约占总盈利的 {formatPercent(metrics.total.feeRate)}。
+                          手续费和滑点约占总盈利的{" "}
+                          {formatPercent(metrics.total.feeRate)}。
                         </p>
                       </div>
                       <div className="rounded-2xl bg-muted px-4 py-3">
@@ -726,7 +823,10 @@ export function TradingJournalPage() {
                         </div>
                       ) : (
                         analytics.mistakeStats.slice(0, 5).map((item) => (
-                          <div key={item.type} className="rounded-2xl bg-muted px-4 py-3">
+                          <div
+                            key={item.type}
+                            className="rounded-2xl bg-muted px-4 py-3"
+                          >
                             <div className="flex items-center justify-between gap-3">
                               <p className="font-medium text-foreground">
                                 {TRADE_MISTAKE_LABELS[item.type]}
@@ -746,32 +846,41 @@ export function TradingJournalPage() {
             </>
           ) : (
             <p className="py-8 text-sm text-muted-foreground">
-              {journal.query.isLoading ? "正在加载分析数据…" : "获取记录后展示分析"}
+              {journal.query.isLoading
+                ? "正在加载分析数据…"
+                : "获取记录后展示分析"}
             </p>
           )}
         </TabsContent>
         <TabsContent value="records">
-          <SectionCard title="交易明细" description="搜索标的、策略或复盘结论。" icon={BarChart3}>
+          <SectionCard
+            title="交易明细"
+            description="搜索标的、策略或复盘结论。"
+            icon={BarChart3}
+          >
             <div className="flex flex-col gap-4 rounded-3xl border border-border bg-muted/80 p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="relative flex-1">
-                  <Search
-                    size={16}
-                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                  />
-                  <Input
+                <InputGroup className="flex-1">
+                  <InputGroupInput
                     aria-label="搜索交易记录"
                     type="search"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="搜索标的、setup、错误类型、开仓理由或复盘结论"
-                    className="pl-9"
                   />
-                </div>
+                  <InputGroupAddon>
+                    <Search aria-hidden="true" />
+                  </InputGroupAddon>
+                </InputGroup>
                 {journal.query.data && (
                   <div className="rounded-2xl bg-card px-4 py-3 text-sm text-muted-foreground">
                     共 {filteredRecords.length} 笔，筛选后净收益{" "}
-                    <span className={cn("font-semibold", getPnlTone(filteredNetPnl))}>
+                    <span
+                      className={cn(
+                        "font-semibold",
+                        getPnlTone(filteredNetPnl),
+                      )}
+                    >
                       {formatSignedCurrency(filteredNetPnl)}
                     </span>
                   </div>
@@ -797,8 +906,13 @@ export function TradingJournalPage() {
 
             <div className="mt-5 space-y-3">
               {journal.query.isLoading ? (
-                <div className="rounded-3xl border border-dashed border-input bg-muted px-6 py-12 text-center text-sm text-muted-foreground">
-                  正在加载交易记录...
+                <div
+                  role="status"
+                  aria-label="正在加载交易记录"
+                  className="flex flex-col gap-3"
+                >
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-32 w-full" />
                 </div>
               ) : journal.query.isError && !journal.query.data ? (
                 <ErrorBox msg="交易记录加载失败，请检查后端服务后重试。" />
@@ -806,7 +920,9 @@ export function TradingJournalPage() {
                 <Empty>
                   <EmptyHeader>
                     <EmptyTitle>
-                      {query || outcomeFilter !== "all" ? "没有符合条件的交易" : "暂无交易记录"}
+                      {query || outcomeFilter !== "all"
+                        ? "没有符合条件的交易"
+                        : "暂无交易记录"}
                     </EmptyTitle>
                     <EmptyDescription>
                       {query || outcomeFilter !== "all"
@@ -825,7 +941,9 @@ export function TradingJournalPage() {
                           : handleCreate
                       }
                     >
-                      {query || outcomeFilter !== "all" ? "清空筛选" : "记录第一笔交易"}
+                      {query || outcomeFilter !== "all"
+                        ? "清空筛选"
+                        : "记录第一笔交易"}
                     </Button>
                   </EmptyContent>
                 </Empty>
@@ -842,31 +960,42 @@ export function TradingJournalPage() {
                   )
 
                   return (
-                    <article
+                    <Card
                       key={record.id}
-                      className="rounded-3xl border border-border bg-card p-4 transition-colors hover:border-input"
+                      role="article"
+                      className="transition-colors hover:border-input"
                     >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                      <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="text-lg font-semibold text-foreground">
+                            <CardTitle className="text-lg">
                               {record.symbol}
-                            </h4>
+                            </CardTitle>
                             <Badge variant={getOutcomeBadgeVariant(record)}>
                               {TRADE_OUTCOME_LABELS[getTradeOutcome(netPnl)]}
                             </Badge>
-                            <Badge variant="secondary">{TRADE_SIDE_LABELS[record.side]}</Badge>
-                            <Badge className="border-border bg-muted text-foreground">
+                            <Badge variant="secondary">
+                              {TRADE_SIDE_LABELS[record.side]}
+                            </Badge>
+                            <Badge variant="secondary">
                               {TRADE_MARKET_LABELS[record.market]}
                             </Badge>
                             {typeof record.followed_plan === "boolean" ? (
-                              <Badge variant={record.followed_plan ? "success" : "warning"}>
-                                {record.followed_plan ? "按计划执行" : "偏离计划"}
+                              <Badge
+                                variant={
+                                  record.followed_plan ? "success" : "warning"
+                                }
+                              >
+                                {record.followed_plan
+                                  ? "按计划执行"
+                                  : "偏离计划"}
                               </Badge>
                             ) : null}
                           </div>
                           <p className="mt-2 text-sm text-muted-foreground">
-                            {record.setup?.trim() ? `Setup：${record.setup}` : "未填写 setup"}
+                            {record.setup?.trim()
+                              ? `Setup：${record.setup}`
+                              : "未填写 setup"}
                           </p>
                           {record.thesis?.trim() ? (
                             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -877,158 +1006,189 @@ export function TradingJournalPage() {
 
                         <div className="text-left lg:text-right">
                           <p
-                            className={cn("text-2xl font-bold tracking-tight", getPnlTone(netPnl))}
+                            className={cn(
+                              "text-2xl font-bold tracking-tight",
+                              getPnlTone(netPnl),
+                            )}
                           >
                             {formatSignedCurrency(netPnl)}
                           </p>
-                          <p className="mt-1 text-sm text-muted-foreground">{record.traded_at}</p>
-                          {(record.fees ?? 0) > 0 || (record.slippage ?? 0) > 0 ? (
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {record.traded_at}
+                          </p>
+                          {(record.fees ?? 0) > 0 ||
+                          (record.slippage ?? 0) > 0 ? (
                             <p className="mt-1 text-xs text-muted-foreground">
                               毛 {formatSignedCurrency(record.pnl)} / 成本{" "}
-                              {currency.format((record.fees ?? 0) + (record.slippage ?? 0))}
+                              {currency.format(
+                                (record.fees ?? 0) + (record.slippage ?? 0),
+                              )}
                             </p>
                           ) : null}
                         </div>
-                      </div>
+                      </CardHeader>
+                      <CardContent>
+                        <details className="mt-4">
+                          <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-muted-foreground">
+                            查看交易与复盘详情
+                          </summary>
+                          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                            <div className="rounded-2xl bg-muted px-4 py-3">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                                持仓结构
+                              </p>
+                              <p className="mt-2 text-sm text-foreground">
+                                {getTradeHoldingLabel(record)}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {getTradeSessionLabel(record)}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl bg-muted px-4 py-3">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                                价格
+                              </p>
+                              <p className="mt-2 text-sm text-foreground">
+                                入 {record.entry_price ?? "—"} / 出{" "}
+                                {record.exit_price ?? "—"}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                仓位 {record.position_size ?? "—"}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl bg-muted px-4 py-3">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                                计划 / 执行
+                              </p>
+                              <p className="mt-2 text-sm text-foreground">
+                                {record.plan_clarity
+                                  ? TRADE_PLAN_CLARITY_LABELS[
+                                      record.plan_clarity
+                                    ]
+                                  : "未评估计划"}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {record.execution_quality
+                                  ? TRADE_EXECUTION_QUALITY_LABELS[
+                                      record.execution_quality
+                                    ]
+                                  : "未评估执行"}
+                              </p>
+                            </div>
+                            <div className="rounded-2xl bg-muted px-4 py-3">
+                              <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                                止盈止损
+                              </p>
+                              <p className="mt-2 text-sm text-foreground">
+                                计划 {record.planned_stop ?? "—"} /{" "}
+                                {record.planned_target ?? "—"}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                实际 {record.actual_stop ?? "—"} /{" "}
+                                {record.actual_target ?? "—"}
+                              </p>
+                            </div>
+                          </div>
 
-                      <details className="mt-4">
-                        <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-muted-foreground">
-                          查看交易与复盘详情
-                        </summary>
-                        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                          <div className="rounded-2xl bg-muted px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                              持仓结构
-                            </p>
-                            <p className="mt-2 text-sm text-foreground">
-                              {getTradeHoldingLabel(record)}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {getTradeSessionLabel(record)}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-muted px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                              价格
-                            </p>
-                            <p className="mt-2 text-sm text-foreground">
-                              入 {record.entry_price ?? "—"} / 出 {record.exit_price ?? "—"}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              仓位 {record.position_size ?? "—"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-muted px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                              计划 / 执行
-                            </p>
-                            <p className="mt-2 text-sm text-foreground">
-                              {record.plan_clarity
-                                ? TRADE_PLAN_CLARITY_LABELS[record.plan_clarity]
-                                : "未评估计划"}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {record.execution_quality
-                                ? TRADE_EXECUTION_QUALITY_LABELS[record.execution_quality]
-                                : "未评估执行"}
-                            </p>
-                          </div>
-                          <div className="rounded-2xl bg-muted px-4 py-3">
-                            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                              止盈止损
-                            </p>
-                            <p className="mt-2 text-sm text-foreground">
-                              计划 {record.planned_stop ?? "—"} / {record.planned_target ?? "—"}
-                            </p>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              实际 {record.actual_stop ?? "—"} / {record.actual_target ?? "—"}
-                            </p>
-                          </div>
+                          {record.market === "options" ? (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {record.option_right ? (
+                                <Badge variant="info">
+                                  {
+                                    TRADE_OPTION_RIGHT_LABELS[
+                                      record.option_right
+                                    ]
+                                  }
+                                </Badge>
+                              ) : null}
+                              {record.option_structure ? (
+                                <Badge variant="info">
+                                  {
+                                    TRADE_OPTION_STRUCTURE_LABELS[
+                                      record.option_structure
+                                    ]
+                                  }
+                                </Badge>
+                              ) : null}
+                              {record.option_premium_type ? (
+                                <Badge variant="info">
+                                  {
+                                    TRADE_PREMIUM_TYPE_LABELS[
+                                      record.option_premium_type
+                                    ]
+                                  }
+                                </Badge>
+                              ) : null}
+                              {record.option_expiration ? (
+                                <Badge variant="secondary">
+                                  到期 {record.option_expiration}
+                                </Badge>
+                              ) : null}
+                              {typeof optionOpenDte === "number" ? (
+                                <Badge variant="secondary">
+                                  开仓 DTE {optionOpenDte}
+                                </Badge>
+                              ) : null}
+                              {typeof optionCloseDte === "number" ? (
+                                <Badge variant="secondary">
+                                  平仓 DTE {optionCloseDte}
+                                </Badge>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {record.mistake_tags.length > 0 ? (
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              {record.mistake_tags.map((tag) => (
+                                <Badge key={tag} variant="warning">
+                                  {TRADE_MISTAKE_LABELS[tag]}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : null}
+
+                          {(record.lesson?.trim() || record.note?.trim()) && (
+                            <div className="mt-4 grid gap-3 md:grid-cols-2">
+                              {record.lesson?.trim() ? (
+                                <Alert variant="success">
+                                  <AlertTitle>唯一结论</AlertTitle>
+                                  <AlertDescription>
+                                    {record.lesson}
+                                  </AlertDescription>
+                                </Alert>
+                              ) : null}
+                              {record.note?.trim() ? (
+                                <div className="rounded-2xl bg-muted px-4 py-3 text-sm leading-6 text-muted-foreground">
+                                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                                    备注
+                                  </p>
+                                  <p className="mt-2">{record.note}</p>
+                                </div>
+                              ) : null}
+                            </div>
+                          )}
+                        </details>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(record)}
+                          >
+                            <PencilLine data-icon="inline-start" />
+                            编辑
+                          </Button>
+                          <Button
+                            variant="destructive-ghost"
+                            size="sm"
+                            onClick={() => handleDelete(record)}
+                            disabled={journal.remove.isPending}
+                          >
+                            <Trash2 data-icon="inline-start" />
+                            删除
+                          </Button>
                         </div>
-
-                        {record.market === "options" ? (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {record.option_right ? (
-                              <Badge variant="info">
-                                {TRADE_OPTION_RIGHT_LABELS[record.option_right]}
-                              </Badge>
-                            ) : null}
-                            {record.option_structure ? (
-                              <Badge variant="info">
-                                {TRADE_OPTION_STRUCTURE_LABELS[record.option_structure]}
-                              </Badge>
-                            ) : null}
-                            {record.option_premium_type ? (
-                              <Badge variant="info">
-                                {TRADE_PREMIUM_TYPE_LABELS[record.option_premium_type]}
-                              </Badge>
-                            ) : null}
-                            {record.option_expiration ? (
-                              <Badge className="border-border bg-muted text-foreground">
-                                到期 {record.option_expiration}
-                              </Badge>
-                            ) : null}
-                            {typeof optionOpenDte === "number" ? (
-                              <Badge className="border-border bg-muted text-foreground">
-                                开仓 DTE {optionOpenDte}
-                              </Badge>
-                            ) : null}
-                            {typeof optionCloseDte === "number" ? (
-                              <Badge className="border-border bg-muted text-foreground">
-                                平仓 DTE {optionCloseDte}
-                              </Badge>
-                            ) : null}
-                          </div>
-                        ) : null}
-
-                        {record.mistake_tags.length > 0 ? (
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {record.mistake_tags.map((tag) => (
-                              <Badge key={tag} variant="warning">
-                                {TRADE_MISTAKE_LABELS[tag]}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : null}
-
-                        {(record.lesson?.trim() || record.note?.trim()) && (
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            {record.lesson?.trim() ? (
-                              <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-income">
-                                  唯一结论
-                                </p>
-                                <p className="mt-2">{record.lesson}</p>
-                              </div>
-                            ) : null}
-                            {record.note?.trim() ? (
-                              <div className="rounded-2xl bg-muted px-4 py-3 text-sm leading-6 text-muted-foreground">
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                                  备注
-                                </p>
-                                <p className="mt-2">{record.note}</p>
-                              </div>
-                            ) : null}
-                          </div>
-                        )}
-                      </details>
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleEdit(record)}>
-                          <PencilLine size={14} />
-                          编辑
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(record)}
-                          disabled={journal.remove.isPending}
-                          className="text-expense hover:bg-red-50 hover:text-red-700"
-                        >
-                          <Trash2 size={14} />
-                          删除
-                        </Button>
-                      </div>
-                    </article>
+                      </CardContent>
+                    </Card>
                   )
                 })
               )}

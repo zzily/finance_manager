@@ -1,6 +1,16 @@
+import { Alert, AlertTitle, AlertDescription } from "../ui/alert"
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "../ui/empty"
+import { Badge } from "../ui/badge"
+import { Spinner } from "../ui/spinner"
 import { useState } from "react"
-import { History, Undo2, Loader2, AlertTriangle } from "lucide-react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog"
+import { History, Undo2, AlertTriangle } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog"
 import { Button } from "../ui/button"
 import { currency } from "../../lib/formatters"
 import { useSettlements } from "../../hooks/useSettlements"
@@ -30,26 +40,37 @@ function UndoConfirm({
   onCancel: () => void
 }) {
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-2">
-      <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
-        <AlertTriangle size={15} />
-        确认撤销这笔核销？
-      </div>
-      <p className="text-xs text-amber-700">
-        将退回 <span className="font-bold">{currency.format(record.amount)}</span> 至资金池（来源：
-        {record.salary_month} {SOURCE_LABEL[record.salary_source] ?? record.salary_source}），
+    <Alert variant="warning">
+      <AlertTriangle aria-hidden="true" />
+      <AlertTitle>确认撤销这笔核销？</AlertTitle>
+      <AlertDescription>
+        将退回{" "}
+        <span className="font-bold">{currency.format(record.amount)}</span>{" "}
+        至资金池（来源：
+        {record.salary_month}{" "}
+        {SOURCE_LABEL[record.salary_source] ?? record.salary_source}），
         账单欠款将相应增加。
-      </p>
-      <div className="flex items-center gap-2 pt-1">
-        <Button size="sm" variant="destructive" disabled={isPending} onClick={onConfirm}>
-          {isPending && <Loader2 size={13} className="animate-spin" />}
+      </AlertDescription>
+      <div className="mt-3 flex items-center gap-2">
+        <Button
+          size="sm"
+          variant="destructive"
+          disabled={isPending}
+          onClick={onConfirm}
+        >
+          {isPending && <Spinner />}
           确认撤销
         </Button>
-        <Button size="sm" variant="ghost" disabled={isPending} onClick={onCancel}>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={isPending}
+          onClick={onCancel}
+        >
           取消
         </Button>
       </div>
-    </div>
+    </Alert>
   )
 }
 
@@ -93,36 +114,47 @@ export function SettlementHistoryDialog({
         <div className="max-h-[400px] space-y-3 overflow-y-auto pr-1">
           {/* Loading */}
           {isLoading && (
-            <div className="flex items-center justify-center py-10 text-sm text-muted-foreground">
-              <Loader2 size={16} className="mr-2 animate-spin" />
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
+              <Spinner />
               加载中...
             </div>
           )}
 
           {/* Error */}
           {isError && (
-            <div className="py-10 text-center text-sm text-red-500">
-              无法加载核销记录，请稍后重试
-            </div>
+            <Alert variant="destructive">
+              <AlertTitle>无法加载核销记录</AlertTitle>
+              <AlertDescription>请稍后重试。</AlertDescription>
+            </Alert>
           )}
 
           {/* Empty */}
           {!isLoading && !isError && records.length === 0 && (
-            <div className="py-10 text-center text-sm text-muted-foreground">暂无核销记录</div>
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>暂无核销记录</EmptyTitle>
+                <EmptyDescription>
+                  关联收入核销后，可在这里查看明细。
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           )}
 
           {/* Records */}
           {records.map((r) => (
-            <div key={r.id} className="rounded-lg border border-border bg-muted/50 p-3 space-y-2">
+            <div
+              key={r.id}
+              className="rounded-lg border border-border bg-muted/50 p-3 space-y-2"
+            >
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold tabular-nums text-foreground">
                       {currency.format(r.amount)}
                     </span>
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    <Badge variant="secondary">
                       {SOURCE_LABEL[r.salary_source] ?? r.salary_source}
-                    </span>
+                    </Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     来源：{r.salary_month} · {formatDate(r.created_at)}
@@ -131,11 +163,10 @@ export function SettlementHistoryDialog({
                 {confirmId !== r.id && (
                   <Button
                     size="sm"
-                    variant="ghost"
-                    className="text-amber-600 hover:bg-amber-50 hover:text-amber-700"
+                    variant="outline"
                     onClick={() => setConfirmId(r.id)}
                   >
-                    <Undo2 size={13} />
+                    <Undo2 data-icon="inline-start" />
                     撤销
                   </Button>
                 )}

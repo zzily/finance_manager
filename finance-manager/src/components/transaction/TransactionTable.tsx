@@ -1,8 +1,17 @@
+import { cn } from "../../lib/utils"
 import { Zap, MoreHorizontal, Pencil, Trash2, History } from "lucide-react"
 import { Button } from "../ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table"
 import {
   DropdownMenu,
+  DropdownMenuGroup,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -10,7 +19,12 @@ import {
 } from "../ui/dropdown-menu"
 import { transactionDate } from "../../lib/navigation"
 import { currency } from "../../lib/formatters"
-import { StatusBadge, CategoryBadge, TableRowSkeleton, EmptyState } from "../common"
+import {
+  StatusBadge,
+  CategoryBadge,
+  TableRowSkeleton,
+  EmptyState,
+} from "../common"
 import type { Transaction } from "../../types"
 
 export function TransactionTable({
@@ -52,10 +66,14 @@ export function TransactionTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {isLoading && Array.from({ length: 4 }).map((_, i) => <TableRowSkeleton key={i} />)}
+        {isLoading &&
+          Array.from({ length: 4 }).map((_, i) => <TableRowSkeleton key={i} />)}
         {isError && (
           <TableRow>
-            <TableCell colSpan={7} className="py-10 text-center text-sm text-red-500">
+            <TableCell
+              colSpan={7}
+              className="py-10 text-center text-sm text-destructive"
+            >
               无法加载账单，请稍后重试
             </TableCell>
           </TableRow>
@@ -84,7 +102,11 @@ export function TransactionTable({
               </TableCell>
               <TableCell>
                 <CategoryBadge category={item.category} />
-                {item.expense_category_name && <span className="text-xs text-muted-foreground">{item.expense_category_name}</span>}
+                {item.expense_category_name && (
+                  <span className="text-xs text-muted-foreground">
+                    {item.expense_category_name}
+                  </span>
+                )}
               </TableCell>
               <TableCell className="tabular-nums text-foreground">
                 {currency.format(item.amount_out)}
@@ -93,7 +115,10 @@ export function TransactionTable({
                 {currency.format(item.amount_reimbursed)}
               </TableCell>
               <TableCell
-                className={`tabular-nums font-medium ${due > 0 ? "text-expense" : "text-income"}`}
+                className={cn(
+                  "tabular-nums font-medium",
+                  due > 0 ? "text-expense" : "text-income",
+                )}
               >
                 {currency.format(due)}
               </TableCell>
@@ -103,39 +128,52 @@ export function TransactionTable({
               <TableCell className="text-right">
                 <div className="inline-flex items-center justify-end gap-1.5">
                   {item.status !== "settled" && (
-                    <Button size="sm" variant="outline" onClick={() => onSettle(item)}>
-                      <Zap size={13} />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onSettle(item)}
+                    >
+                      <Zap data-icon="inline-start" />
                       核销
                     </Button>
                   )}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
                         aria-label={`${item.title}的更多操作`}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
                       >
-                        <MoreHorizontal size={15} />
-                      </button>
+                        <MoreHorizontal aria-hidden="true" />
+                      </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      {item.amount_reimbursed > 0 && (
-                        <DropdownMenuItem onClick={() => onHistory(item)}>
-                          <History size={14} className="text-muted-foreground" />
-                          核销记录
+                      <DropdownMenuGroup>
+                        {item.amount_reimbursed > 0 && (
+                          <DropdownMenuItem onClick={() => onHistory(item)}>
+                            <History
+                              size={14}
+                              className="text-muted-foreground"
+                            />
+                            核销记录
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem onClick={() => onEdit(item)}>
+                          <Pencil size={14} className="text-muted-foreground" />
+                          编辑
                         </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem onClick={() => onEdit(item)}>
-                        <Pencil size={14} className="text-muted-foreground" />
-                        编辑
-                      </DropdownMenuItem>
+                      </DropdownMenuGroup>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        className="text-expense focus:text-expense focus:bg-red-50"
-                        onClick={() => onDelete(item)}
-                      >
-                        <Trash2 size={14} />
-                        删除
-                      </DropdownMenuItem>
+                      <DropdownMenuGroup>
+                        <DropdownMenuItem
+                          variant="destructive"
+                          onClick={() => onDelete(item)}
+                        >
+                          <Trash2 size={14} />
+                          删除
+                        </DropdownMenuItem>
+                      </DropdownMenuGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

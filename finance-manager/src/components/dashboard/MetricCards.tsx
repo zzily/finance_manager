@@ -1,7 +1,14 @@
 import { ChevronRight } from "lucide-react"
 import { currency } from "../../lib/formatters"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/card"
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "../ui/card"
 import { Skeleton } from "../ui/skeleton"
+import { Button } from "../ui/button"
 
 export function BalanceCard({
   isLoading,
@@ -27,14 +34,16 @@ export function BalanceCard({
           </p>
         )}
         {onClick && (
-          <button
+          <Button
+            variant="link"
+            size="sm"
             type="button"
             onClick={onClick}
-            className="mt-2 flex min-h-9 items-center gap-1 text-xs text-muted-foreground underline-offset-4 hover:underline"
+            className="mt-2 px-0 text-muted-foreground"
           >
             查看资金池明细
-            <ChevronRight className="size-3" />
-          </button>
+            <ChevronRight data-icon="inline-end" aria-hidden="true" />
+          </Button>
         )}
       </CardContent>
     </Card>
@@ -66,6 +75,28 @@ export function TotalAssetsCard({
   )
 }
 
-export function UnsettledBillsCard({isLoading,amount}:{isLoading:boolean;amount:number}){
- return <Card><CardHeader><CardTitle>待核销账单</CardTitle><CardDescription>个人支出与工作垫付的未结金额</CardDescription></CardHeader><CardContent>{isLoading?<Skeleton className="h-8 w-24" />:<p className="text-xl font-semibold tabular-nums sm:text-2xl">{currency.format(amount)}</p>}</CardContent></Card>
+export function UnsettledBillsCard({
+  isLoading,
+  amount,
+}: {
+  isLoading: boolean
+  amount: number
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>待核销账单</CardTitle>
+        <CardDescription>个人支出与工作垫付的未结金额</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <Skeleton className="h-8 w-24" />
+        ) : (
+          <p className="text-xl font-semibold tabular-nums sm:text-2xl">
+            {currency.format(amount)}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
 }

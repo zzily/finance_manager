@@ -1,3 +1,7 @@
+import { cn } from "../../lib/utils"
+import { Badge } from "../ui/badge"
+import { Alert, AlertDescription } from "../ui/alert"
+import { Empty, EmptyHeader, EmptyTitle } from "../ui/empty"
 import { useState } from "react"
 import { Pencil, Trash2, Loader2 } from "lucide-react"
 import {
@@ -9,7 +13,14 @@ import {
   DialogTitle,
 } from "../ui/dialog"
 import { Button } from "../ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table"
 import { Skeleton } from "../ui/skeleton"
 import { currency } from "../../lib/formatters"
 import type { SalaryLog } from "../../types"
@@ -101,15 +112,29 @@ export function SalaryPoolDialog({
                 ))}
               {isError && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-red-500">
-                    无法加载收入明细，请稍后重试
+                  <TableCell
+                    colSpan={7}
+                    className="py-8 text-center text-sm text-destructive"
+                  >
+                    <Alert variant="destructive">
+                      <AlertDescription>
+                        无法加载收入明细，请稍后重试
+                      </AlertDescription>
+                    </Alert>
                   </TableCell>
                 </TableRow>
               )}
               {!isLoading && !isError && data.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                    暂无收入记录
+                  <TableCell
+                    colSpan={7}
+                    className="py-8 text-center text-sm text-muted-foreground"
+                  >
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyTitle>暂无收入记录</EmptyTitle>
+                      </EmptyHeader>
+                    </Empty>
                   </TableCell>
                 </TableRow>
               )}
@@ -119,19 +144,21 @@ export function SalaryPoolDialog({
                 const isConfirming = confirmDeleteId === log.id
                 return (
                   <TableRow key={log.id} className="group/row">
-                    <TableCell className="tabular-nums text-foreground">{log.month}</TableCell>
+                    <TableCell className="tabular-nums text-foreground">
+                      {log.month}
+                    </TableCell>
                     <TableCell>
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      <Badge
+                        variant={
                           log.source === "salary"
-                            ? "bg-emerald-50 text-emerald-700"
+                            ? "success"
                             : log.source === "reimbursement"
-                              ? "bg-cyan-50 text-cyan-700"
-                              : "bg-muted text-muted-foreground"
-                        }`}
+                              ? "info"
+                              : "secondary"
+                        }
                       >
                         {sourceLabel[log.source]}
-                      </span>
+                      </Badge>
                     </TableCell>
                     <TableCell className="tabular-nums font-medium text-foreground">
                       {currency.format(log.amount)}
@@ -140,7 +167,12 @@ export function SalaryPoolDialog({
                       {currency.format(used)}
                     </TableCell>
                     <TableCell
-                      className={`tabular-nums font-medium ${log.amount_unused > 0 ? "text-income" : "text-muted-foreground"}`}
+                      className={cn(
+                        "tabular-nums font-medium",
+                        log.amount_unused > 0
+                          ? "text-income"
+                          : "text-muted-foreground",
+                      )}
                     >
                       {currency.format(log.amount_unused)}
                     </TableCell>
@@ -159,7 +191,14 @@ export function SalaryPoolDialog({
                             disabled={isDeleting}
                             onClick={() => handleDelete(log.id)}
                           >
-                            {isDeleting ? <Loader2 size={13} className="animate-spin" /> : "确认"}
+                            {isDeleting ? (
+                              <Loader2
+                                data-icon="inline-start"
+                                className="animate-spin"
+                              />
+                            ) : (
+                              "确认"
+                            )}
                           </Button>
                           <Button
                             size="sm"
@@ -179,22 +218,21 @@ export function SalaryPoolDialog({
                             aria-label={`编辑${log.month}${sourceLabel[log.source]}`}
                             onClick={() => onEdit(log)}
                           >
-                            <Pencil size={13} />
+                            <Pencil data-icon="inline-start" />
                           </Button>
                           <Button
                             size="sm"
-                            variant="ghost"
-                            className={
-                              hasSettlements
-                                ? "cursor-not-allowed text-slate-300"
-                                : "text-red-500 hover:text-expense"
-                            }
+                            variant="destructive-ghost"
                             disabled={hasSettlements}
                             aria-label={`删除${log.month}${sourceLabel[log.source]}`}
                             onClick={() => setConfirmDeleteId(log.id)}
-                            title={hasSettlements ? "有核销记录，无法删除" : "删除此回款"}
+                            title={
+                              hasSettlements
+                                ? "有核销记录，无法删除"
+                                : "删除此回款"
+                            }
                           >
-                            <Trash2 size={13} />
+                            <Trash2 data-icon="inline-start" />
                           </Button>
                         </div>
                       )}

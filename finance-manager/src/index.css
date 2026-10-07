@@ -27,11 +27,13 @@
     --expense: 0 72% 45%;
     --warning: 38 85% 35%;
     --warning-foreground: 38 85% 22%;
+    --info: 215 78% 42%;
     --radius: 0.75rem;
     --chart-1: 163 78% 35%;
     --chart-2: 190 80% 35%;
     --chart-3: 38 90% 45%;
     --chart-4: 0 72% 45%;
+    --chart-5: 222 47% 35%;
   }
   * {
     @apply border-border;

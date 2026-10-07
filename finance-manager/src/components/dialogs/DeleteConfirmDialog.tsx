@@ -37,10 +37,12 @@ export function DeleteConfirmDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>删除账单</DialogTitle>
-          <DialogDescription>删除后无法恢复，请确认是否删除该账单。</DialogDescription>
+          <DialogDescription>
+            删除后无法恢复，请确认是否删除该账单。
+          </DialogDescription>
         </DialogHeader>
         {transaction && (
-          <div className="rounded-lg border border-red-100 bg-red-50/50 px-3 py-2.5 text-sm text-foreground">
+          <div className="rounded-lg border border-destructive/20 bg-destructive/50 px-3 py-2.5 text-sm text-foreground">
             <span className="font-medium">{transaction.title}</span>
             <span className="ml-2 tabular-nums text-muted-foreground">
               {currency.format(transaction.amount_out)}
@@ -50,7 +52,11 @@ export function DeleteConfirmDialog({
         {error && <ErrorBox msg={error} />}
         <DialogFooter>
           <DialogCancel asChild>
-            <Button variant="secondary" onClick={() => onOpenChange(false)} disabled={isPending}>
+            <Button
+              variant="secondary"
+              onClick={() => onOpenChange(false)}
+              disabled={isPending}
+            >
               取消
             </Button>
           </DialogCancel>

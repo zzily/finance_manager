@@ -1,3 +1,4 @@
+import { NativeSelect } from "../ui/native-select"
 import { useState } from "react"
 import { useExpenseCategories } from "../../hooks/useExpenseCategories"
 import { Button } from "../ui/button"
@@ -55,7 +56,7 @@ export function ExpenseCategorySettings() {
   return (
     <Field>
       <FieldLabel htmlFor="settings-category-kind">支出分类</FieldLabel>
-      <select
+      <NativeSelect
         id="settings-category-kind"
         className="h-11 rounded-md border bg-background px-3 text-sm"
         value={kind}
@@ -63,7 +64,7 @@ export function ExpenseCategorySettings() {
       >
         <option value="personal">个人支出</option>
         <option value="work">工作垫付</option>
-      </select>
+      </NativeSelect>
       <FieldDescription>
         停用后不再用于新账单，历史记录仍保留原分类。
       </FieldDescription>

@@ -9,7 +9,11 @@ export const buttonVariants = cva(
         secondary: "bg-muted text-foreground hover:bg-accent",
         outline: "border border-input bg-background hover:bg-muted",
         ghost: "hover:bg-muted",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        "destructive-ghost":
+          "text-destructive hover:bg-destructive/10 hover:text-destructive",
+        link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
         default: "min-h-11 sm:min-h-10 h-10 px-4 py-2",

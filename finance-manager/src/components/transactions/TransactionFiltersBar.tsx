@@ -1,11 +1,19 @@
+import { NativeSelect } from "../ui/native-select"
 import { useState } from "react"
 import { SlidersHorizontal } from "lucide-react"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group"
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "../ui/collapsible"
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "../ui/collapsible"
 import { Field, FieldLabel, FieldGroup } from "../ui/field"
-import type { TransactionFilterState, TransactionSort } from "../../hooks/useTransactionFilters"
+import type {
+  TransactionFilterState,
+  TransactionSort,
+} from "../../hooks/useTransactionFilters"
 const statusOptions = [
   { value: "all", label: "全部" },
   { value: "open", label: "待处理" },
@@ -45,9 +53,16 @@ export function TransactionFiltersBar({
   onStatusChange: (v: TransactionFilterState["status"]) => void
   state: TransactionFilterState
 }) {
-  const [expanded, setExpanded] = useState(state.month !== "all" || state.category !== "all" || Boolean(state.expenseCategoryId && state.expenseCategoryId !== "all"))
+  const [expanded, setExpanded] = useState(
+    state.month !== "all" ||
+      state.category !== "all" ||
+      Boolean(state.expenseCategoryId && state.expenseCategoryId !== "all"),
+  )
   const months = Array.from(
-    new Set([...availableMonths, ...(state.month !== "all" ? [state.month] : [])]),
+    new Set([
+      ...availableMonths,
+      ...(state.month !== "all" ? [state.month] : []),
+    ]),
   )
     .sort()
     .reverse()
@@ -98,11 +113,10 @@ export function TransactionFiltersBar({
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel htmlFor="filter-month">月份</FieldLabel>
-                <select
+                <NativeSelect
                   id="filter-month"
                   value={state.month}
                   onChange={(e) => onMonthChange(e.target.value)}
-                  className="h-10 w-full rounded-md border bg-background px-2 text-sm"
                 >
                   <option value="all">全部月份</option>
                   {months.map((m) => (
@@ -110,22 +124,23 @@ export function TransactionFiltersBar({
                       {m}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </Field>
               <Field>
                 <FieldLabel htmlFor="filter-sort">排序</FieldLabel>
-                <select
+                <NativeSelect
                   id="filter-sort"
                   value={state.sort}
-                  onChange={(e) => onSortChange(e.target.value as TransactionSort)}
-                  className="h-10 w-full rounded-md border bg-background px-2 text-sm"
+                  onChange={(e) =>
+                    onSortChange(e.target.value as TransactionSort)
+                  }
                 >
                   {Object.entries(sorts).map(([value, label]) => (
                     <option key={value} value={value}>
                       {label}
                     </option>
                   ))}
-                </select>
+                </NativeSelect>
               </Field>
             </div>
             <Field>
@@ -134,7 +149,8 @@ export function TransactionFiltersBar({
                 type="single"
                 value={state.category}
                 onValueChange={(v) => {
-                  if (v) onCategoryChange(v as TransactionFilterState["category"])
+                  if (v)
+                    onCategoryChange(v as TransactionFilterState["category"])
                 }}
                 aria-label="账单类型"
                 className="justify-start"
@@ -144,7 +160,27 @@ export function TransactionFiltersBar({
                 <ToggleGroupItem value="personal">个人支出</ToggleGroupItem>
               </ToggleGroup>
             </Field>
-            {onExpenseCategoryChange && availableExpenseCategories.length > 0 && <Field><FieldLabel htmlFor="filter-expense-category">支出分类</FieldLabel><select id="filter-expense-category" className="h-11 w-full rounded-md border bg-background px-2 text-sm" value={state.expenseCategoryId ?? "all"} onChange={e => onExpenseCategoryChange(e.target.value)}><option value="all">全部分类</option><option value="uncategorized">未分类</option>{availableExpenseCategories.map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></Field>}
+            {onExpenseCategoryChange &&
+              availableExpenseCategories.length > 0 && (
+                <Field>
+                  <FieldLabel htmlFor="filter-expense-category">
+                    支出分类
+                  </FieldLabel>
+                  <NativeSelect
+                    id="filter-expense-category"
+                    value={state.expenseCategoryId ?? "all"}
+                    onChange={(e) => onExpenseCategoryChange(e.target.value)}
+                  >
+                    <option value="all">全部分类</option>
+                    <option value="uncategorized">未分类</option>
+                    {availableExpenseCategories.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                  </NativeSelect>
+                </Field>
+              )}
           </FieldGroup>
         </CollapsibleContent>
       </Collapsible>

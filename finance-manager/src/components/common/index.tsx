@@ -1,5 +1,11 @@
 import { Alert, AlertDescription } from "../ui/alert"
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription, EmptyContent } from "../ui/empty"
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "../ui/empty"
 import { CheckCircle2, Clock, Timer, Briefcase, User } from "lucide-react"
 import { Badge } from "../ui/badge"
 import { Skeleton } from "../ui/skeleton"
@@ -32,7 +38,11 @@ export function StatusBadge({ status }: { status: Transaction["status"] }) {
 }
 
 /* ─── Category badge ─── */
-export function CategoryBadge({ category }: { category: Transaction["category"] }) {
+export function CategoryBadge({
+  category,
+}: {
+  category: Transaction["category"]
+}) {
   if (category === "work")
     return (
       <Badge variant="info">
@@ -41,7 +51,7 @@ export function CategoryBadge({ category }: { category: Transaction["category"] 
       </Badge>
     )
   return (
-    <Badge className="border-orange-200 bg-orange-50 text-orange-700">
+    <Badge variant="warning">
       <User size={11} />
       个人
     </Badge>
@@ -61,7 +71,7 @@ export function ErrorBox({ msg }: { msg: string }) {
 export function CardSkeleton() {
   return (
     <div className="relative overflow-hidden rounded-xl bg-card shadow-sm">
-      <div className="absolute left-0 top-0 h-full w-1 bg-slate-200" />
+      <div className="absolute left-0 top-0 h-full w-1 bg-muted" />
       <div className="px-5 py-4 space-y-3">
         <Skeleton className="h-3 w-24" />
         <Skeleton className="h-3 w-36" />
@@ -74,7 +84,7 @@ export function CardSkeleton() {
 export function DualCardSkeleton() {
   return (
     <div className="relative overflow-hidden rounded-xl bg-card shadow-sm">
-      <div className="absolute left-0 top-0 h-full w-1 bg-slate-200" />
+      <div className="absolute left-0 top-0 h-full w-1 bg-muted" />
       <div className="px-5 py-4 space-y-3">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
@@ -167,9 +177,13 @@ export function EmptyState({
   return (
     <Empty>
       <EmptyHeader>
-        <EmptyTitle>{filtered ? "没有符合条件的账单" : "暂无账单记录"}</EmptyTitle>
+        <EmptyTitle>
+          {filtered ? "没有符合条件的账单" : "暂无账单记录"}
+        </EmptyTitle>
         <EmptyDescription>
-          {filtered ? "调整或清空筛选后再试。" : "记录一笔支出或垫付，开始整理账本。"}
+          {filtered
+            ? "调整或清空筛选后再试。"
+            : "记录一笔支出或垫付，开始整理账本。"}
         </EmptyDescription>
       </EmptyHeader>
       <EmptyContent>

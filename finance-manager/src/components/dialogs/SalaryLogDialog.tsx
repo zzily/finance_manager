@@ -1,3 +1,4 @@
+import { NativeSelect } from "../ui/native-select"
 import { useState } from "react"
 import {
   Dialog,
@@ -49,7 +50,9 @@ function Body({ onOpenChange, isPending, onSubmit }: Props) {
       >
         <DialogHeader>
           <DialogTitle>录入收入</DialogTitle>
-          <DialogDescription>工资、报销或其他到账收入，金额统一使用人民币。</DialogDescription>
+          <DialogDescription>
+            工资、报销或其他到账收入，金额统一使用人民币。
+          </DialogDescription>
         </DialogHeader>
         <FieldGroup className="gap-4">
           <Field data-invalid={attempted && Boolean(error)}>
@@ -64,12 +67,16 @@ function Body({ onOpenChange, isPending, onSubmit }: Props) {
               onChange={(e) => setAmount(e.target.value)}
               autoFocus
               aria-invalid={attempted && Boolean(error)}
-              aria-describedby={attempted && error ? "income-amount-error" : undefined}
+              aria-describedby={
+                attempted && error ? "income-amount-error" : undefined
+              }
             />
-            {attempted && error && <FieldError id="income-amount-error">{error}</FieldError>}
+            {attempted && error && (
+              <FieldError id="income-amount-error">{error}</FieldError>
+            )}
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field>
+            <Field data-invalid={attempted && (!date || date > todayKey())}>
               <FieldLabel htmlFor="income-date">到账日期</FieldLabel>
               <Input
                 id="income-date"
@@ -80,14 +87,18 @@ function Body({ onOpenChange, isPending, onSubmit }: Props) {
                 required
                 aria-invalid={attempted && (!date || date > todayKey())}
                 aria-describedby={
-                  attempted && (!date || date > todayKey()) ? "income-date-error" : undefined
+                  attempted && (!date || date > todayKey())
+                    ? "income-date-error"
+                    : undefined
                 }
               />
               {attempted && (!date || date > todayKey()) && (
-                <FieldError id="income-date-error">请选择不晚于今天的到账日期</FieldError>
+                <FieldError id="income-date-error">
+                  请选择不晚于今天的到账日期
+                </FieldError>
               )}
             </Field>
-            <Field>
+            <Field data-invalid={attempted && !month}>
               <FieldLabel htmlFor="income-month">归属月份</FieldLabel>
               <Input
                 id="income-month"
@@ -96,7 +107,9 @@ function Body({ onOpenChange, isPending, onSubmit }: Props) {
                 onChange={(e) => setMonth(e.target.value)}
                 required
                 aria-invalid={attempted && !month}
-                aria-describedby={attempted && !month ? "income-month-error" : undefined}
+                aria-describedby={
+                  attempted && !month ? "income-month-error" : undefined
+                }
               />
               {attempted && !month && (
                 <FieldError id="income-month-error">请选择归属月份</FieldError>
@@ -105,16 +118,17 @@ function Body({ onOpenChange, isPending, onSubmit }: Props) {
           </div>
           <Field>
             <FieldLabel htmlFor="income-source">收入来源</FieldLabel>
-            <select
+            <NativeSelect
               id="income-source"
               value={source}
-              onChange={(e) => setSource(e.target.value as SalaryLogCreate["source"])}
-              className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+              onChange={(e) =>
+                setSource(e.target.value as SalaryLogCreate["source"])
+              }
             >
               <option value="salary">工资</option>
               <option value="reimbursement">报销</option>
               <option value="other">其他收入</option>
-            </select>
+            </NativeSelect>
           </Field>
           <Field>
             <FieldLabel htmlFor="income-remark">备注（可选）</FieldLabel>

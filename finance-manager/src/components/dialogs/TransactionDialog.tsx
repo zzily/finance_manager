@@ -1,3 +1,4 @@
+import { NativeSelect } from "../ui/native-select"
 import { useState } from "react"
 import { toast } from "sonner"
 import {
@@ -14,9 +15,12 @@ import {
   FieldLabel,
   FieldError,
   FieldDescription,
+  FieldSet,
+  FieldLegend,
 } from "../ui/field"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
+import { Checkbox } from "../ui/checkbox"
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group"
 import { todayKey, moneyError } from "../../lib/formHelpers"
 import {
@@ -173,14 +177,13 @@ function Body({
           {templates.length > 0 && (
             <Field>
               <FieldLabel htmlFor="bill-template">使用常用记录</FieldLabel>
-              <select
+              <NativeSelect
                 id="bill-template"
                 defaultValue=""
                 onChange={(e) => {
                   const t = templates[Number(e.target.value)]
                   if (t) apply(t)
                 }}
-                className="h-10 w-full rounded-md border bg-background px-3 text-sm"
               >
                 <option value="" disabled>
                   选择模板
@@ -191,7 +194,7 @@ function Body({
                     {t.repeatMonthly ? " · 每月重复" : ""}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </Field>
           )}
           <FieldGroup className="gap-4">
@@ -280,9 +283,8 @@ function Body({
                 <FieldLabel htmlFor="bill-expense-category">
                   支出分类
                 </FieldLabel>
-                <select
+                <NativeSelect
                   id="bill-expense-category"
-                  className="h-11 w-full rounded-md border bg-background px-3 text-sm"
                   value={expenseCategoryId ?? ""}
                   onChange={(e) =>
                     setExpenseCategoryId(
@@ -298,7 +300,7 @@ function Body({
                         {c.name}
                       </option>
                     ))}
-                </select>
+                </NativeSelect>
                 {categoriesError && (
                   <FieldDescription>
                     分类加载失败，可以先记为未分类；稍后在编辑中补充。
@@ -307,7 +309,7 @@ function Body({
               </Field>
             )}
             {supportsImmediatePayment && category === "personal" && (
-              <Field>
+              <Field data-invalid={attempted && Boolean(paymentError)}>
                 <FieldLabel id="bill-payment-label">支付记录</FieldLabel>
                 <ToggleGroup
                   type="single"
@@ -328,9 +330,14 @@ function Body({
                     <FieldLabel htmlFor="bill-payment-income">
                       使用已到账收入
                     </FieldLabel>
-                    <select
+                    <NativeSelect
                       id="bill-payment-income"
-                      className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                      aria-invalid={attempted && Boolean(paymentError)}
+                      aria-describedby={
+                        attempted && paymentError
+                          ? "bill-payment-error"
+                          : undefined
+                      }
                       value={incomeId}
                       onChange={(e) => setIncomeId(e.target.value)}
                       disabled={incomeLoading || incomeError}
@@ -355,42 +362,51 @@ function Body({
                           · 可用 {currency.format(i.amount_unused)}
                         </option>
                       ))}
-                    </select>
+                    </NativeSelect>
                     <FieldDescription>
                       保存消费并全额关联这笔收入；两步同时成功后才会入账。
                     </FieldDescription>
                     {attempted && paymentError && (
-                      <FieldError>{paymentError}</FieldError>
+                      <FieldError id="bill-payment-error">
+                        {paymentError}
+                      </FieldError>
                     )}
                   </>
                 )}
               </Field>
             )}
-            <Field>
-              <label className="flex min-h-10 items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+            <FieldSet className="gap-3">
+              <FieldLegend variant="label">常用记录</FieldLegend>
+              <Field orientation="horizontal" className="min-h-10">
+                <Checkbox
+                  id="bill-save-template"
                   checked={saveTemplate}
-                  onChange={(e) => setSaveTemplate(e.target.checked)}
+                  onCheckedChange={(checked) =>
+                    setSaveTemplate(checked === true)
+                  }
                 />
-                保存为常用记录
-              </label>
+                <FieldLabel htmlFor="bill-save-template">
+                  保存为常用记录
+                </FieldLabel>
+              </Field>
               {saveTemplate && (
                 <>
-                  <label className="flex min-h-10 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
+                  <Field orientation="horizontal" className="min-h-10">
+                    <Checkbox
+                      id="bill-monthly"
                       checked={monthly}
-                      onChange={(e) => setMonthly(e.target.checked)}
+                      onCheckedChange={(checked) =>
+                        setMonthly(checked === true)
+                      }
                     />
-                    每月重复提醒
-                  </label>
+                    <FieldLabel htmlFor="bill-monthly">每月重复提醒</FieldLabel>
+                  </Field>
                   <FieldDescription>
                     模板保存在此设备；重复账单需你确认后才录入。
                   </FieldDescription>
                 </>
               )}
-            </Field>
+            </FieldSet>
           </FieldGroup>
         </div>
         <DialogFooter className="border-t px-6 pb-6 pt-3">

@@ -1,3 +1,4 @@
+import { cn } from "../../lib/utils"
 import { Zap, Pencil, Trash2, History } from "lucide-react"
 import { Button } from "../ui/button"
 import { transactionDate } from "../../lib/navigation"
@@ -23,13 +24,21 @@ export function MobileTransactionCard({
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="truncate text-sm font-semibold text-foreground">{item.title}</span>
+          <span className="truncate text-sm font-semibold text-foreground">
+            {item.title}
+          </span>
           <CategoryBadge category={item.category} />
-                {item.expense_category_name && <span className="text-xs text-muted-foreground">{item.expense_category_name}</span>}
+          {item.expense_category_name && (
+            <span className="text-xs text-muted-foreground">
+              {item.expense_category_name}
+            </span>
+          )}
         </div>
         <StatusBadge status={item.status} />
       </div>
-      <p className="text-xs text-muted-foreground">{transactionDate(item).slice(0, 10)}</p>
+      <p className="text-xs text-muted-foreground">
+        {transactionDate(item).slice(0, 10)}
+      </p>
       <div className="grid grid-cols-3 gap-2 text-center">
         <div>
           <p className="text-[11px] text-muted-foreground">账单金额</p>
@@ -46,16 +55,24 @@ export function MobileTransactionCard({
         <div>
           <p className="text-[11px] text-muted-foreground">未结清</p>
           <p
-            className={`text-sm font-bold tabular-nums ${due > 0 ? "text-expense" : "text-income"}`}
+            className={cn(
+              "text-sm font-bold tabular-nums",
+              due > 0 ? "text-expense" : "text-income",
+            )}
           >
             {currency.format(due)}
           </p>
         </div>
       </div>
-      <div className="flex items-center gap-2 pt-1 border-t border-slate-50">
+      <div className="flex items-center gap-2 pt-1 border-t border-border">
         {item.status !== "settled" && (
-          <Button size="sm" variant="outline" className="flex-1" onClick={() => onSettle(item)}>
-            <Zap size={13} />
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1"
+            onClick={() => onSettle(item)}
+          >
+            <Zap data-icon="inline-start" />
             核销
           </Button>
         )}
@@ -67,7 +84,7 @@ export function MobileTransactionCard({
             className="text-muted-foreground"
             onClick={() => onHistory(item)}
           >
-            <History size={13} />
+            <History data-icon="inline-start" />
           </Button>
         )}
         <Button
@@ -77,16 +94,16 @@ export function MobileTransactionCard({
           className="text-muted-foreground"
           onClick={() => onEdit(item)}
         >
-          <Pencil size={13} />
+          <Pencil data-icon="inline-start" />
         </Button>
         <Button
           size="sm"
           variant="ghost"
           aria-label={`删除${item.title}`}
-          className="text-red-500"
+          className="text-destructive"
           onClick={() => onDelete(item)}
         >
-          <Trash2 size={13} />
+          <Trash2 data-icon="inline-start" />
         </Button>
       </div>
     </div>

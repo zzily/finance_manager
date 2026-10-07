@@ -1,9 +1,15 @@
 import { ArrowDownCircle, Plus, Wallet } from "lucide-react"
 
 import { BusinessLoopCard } from "../components/dashboard/BusinessLoopCard"
-import { MonthlyTrendChart, CategoryPieChart } from "../components/dashboard/Charts"
+import {
+  MonthlyTrendChart,
+  CategoryPieChart,
+} from "../components/dashboard/Charts"
 import { FamilyLoopCard } from "../components/dashboard/FamilyLoopCard"
-import { BalanceCard, TotalAssetsCard } from "../components/dashboard/MetricCards"
+import {
+  BalanceCard,
+  TotalAssetsCard,
+} from "../components/dashboard/MetricCards"
 import { OperationBar } from "../components/dashboard/OperationBar"
 import { Button } from "../components/ui/button"
 import { useSalaryLogs } from "../hooks/useSalaryLogs"
@@ -17,27 +23,43 @@ export default function SettlementPage() {
   const transactions = useTransactions()
   const salary = useSalaryLogs()
   const summary = useSummary()
-  const pageState = useSettlementPageState(transactions.all, transactions.unsettled)
+  const pageState = useSettlementPageState(
+    transactions.all,
+    transactions.unsettled,
+  )
 
   return (
-    <div className="min-h-screen bg-slate-50" data-testid="settlement-page">
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/80 shadow-[0_1px_0_0_rgb(0_0_0/.04)] backdrop-blur-md">
+    <div className="min-h-screen bg-muted/50" data-testid="settlement-page">
+      <header className="sticky top-0 z-30 border-b border-border/80 bg-white/80 shadow-[0_1px_0_0_rgb(0_0_0/.04)] backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-white shadow-sm">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm">
               <Wallet size={18} />
             </div>
             <div>
-              <h1 className="text-base font-bold leading-tight tracking-tight text-slate-950">财务管理</h1>
-              <p className="text-xs text-slate-400">个人垫付与核销</p>
+              <h1 className="text-base font-bold leading-tight tracking-tight text-foreground">
+                财务管理
+              </h1>
+              <p className="text-xs text-muted-foreground">个人垫付与核销</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => pageState.setTxnDialogOpen(true)}>
-              <Plus size={14} /><span className="hidden sm:inline">记录垫付</span><span className="sm:hidden">垫付</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => pageState.setTxnDialogOpen(true)}
+            >
+              <Plus data-icon="inline-start" />
+              <span className="hidden sm:inline">记录垫付</span>
+              <span className="sm:hidden">垫付</span>
             </Button>
-            <Button size="sm" onClick={() => pageState.setSalaryDialogOpen(true)}>
-              <ArrowDownCircle size={14} /><span className="hidden sm:inline">录入回款</span><span className="sm:hidden">回款</span>
+            <Button
+              size="sm"
+              onClick={() => pageState.setSalaryDialogOpen(true)}
+            >
+              <ArrowDownCircle data-icon="inline-start" />
+              <span className="hidden sm:inline">录入回款</span>
+              <span className="sm:hidden">回款</span>
             </Button>
           </div>
         </div>
@@ -50,7 +72,10 @@ export default function SettlementPage() {
             balance={summary.availableBalance}
             onClick={() => pageState.setPoolOpen(true)}
           />
-          <TotalAssetsCard isLoading={summary.isLoading} totalAssets={summary.totalAssets} />
+          <TotalAssetsCard
+            isLoading={summary.isLoading}
+            totalAssets={summary.totalAssets}
+          />
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -69,9 +94,15 @@ export default function SettlementPage() {
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="md:col-span-2">
-            <MonthlyTrendChart data={summary.chartData} isLoading={summary.isLoading} />
+            <MonthlyTrendChart
+              data={summary.chartData}
+              isLoading={summary.isLoading}
+            />
           </div>
-          <CategoryPieChart data={summary.chartData} isLoading={summary.isLoading} />
+          <CategoryPieChart
+            data={summary.chartData}
+            isLoading={summary.isLoading}
+          />
         </div>
 
         <OperationBar
@@ -95,7 +126,11 @@ export default function SettlementPage() {
         />
       </main>
 
-      <SettlementDialogs pageState={pageState} salary={salary} transactions={transactions} />
+      <SettlementDialogs
+        pageState={pageState}
+        salary={salary}
+        transactions={transactions}
+      />
     </div>
   )
 }
